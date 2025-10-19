@@ -2,59 +2,66 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import ProductCard from "../components/ProductCard";
 
-export default function Shop() {
-  // --- ESTADOS DEL COMPONENTE ---
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]); // Para la lista de categorías de la API
-  const [activeFilters, setActiveFilters] = useState([]); // Para guardar las categorías seleccionadas
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [visible, setVisible] = useState(12); // Para el botón "Ver más"
+// --- 1. LISTA ESTÁTICA BASADA EN TU BASE DE DATOS LIMPIA ---
+// El 'key' es en minúsculas para el filtro y el 'label' es para mostrarlo al usuario.
+const FILTERS = [
+  { key: "accesorios", label: "Accesorios" },
+  { key: "aminoácidos", label: "Aminoácidos" },
+  { key: "carbohidratos", label: "Carbohidratos" },
+  { key: "creatina", label: "Creatina" },
+  { key: "diuréticos", label: "Diuréticos" },
+  { key: "ganadores de peso", label: "Ganadores de peso" },
+  { key: "pre-entrenos", label: "Pre-Entrenos" },
+  { key: "precursores", label: "Precursores" },
+  { key: "proteínas", label: "Proteínas" },
+  { key: "quemadores", label: "Quemadores" },
+  { key: "salud y bienestar", label: "Salud y Bienestar" },
+  { key: "vitaminas", label: "Vitaminas" },
+];
 
-  // --- EFECTO PARA CARGAR DATOS DE LA API ---
+export default function Shop() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState(12);
+  const [activeFilters, setActiveFilters] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // --- 2. SE CARGAN ÚNICAMENTE LOS PRODUCTOS ---
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL;
     setLoading(true);
-
-    // Hacemos las dos peticiones (productos y categorías) al mismo tiempo
-    Promise.all([
-      axios.get(`${API_URL}/api/products`),
-      axios.get(`${API_URL}/api/categories`)
-    ])
-    .then(([productsRes, categoriesRes]) => {
-      setProducts(productsRes.data || []);
-      setCategories(categoriesRes.data || []); // Guardamos las categorías en el estado
-    })
-    .catch(err => console.error("Error al cargar datos:", err))
-    .finally(() => setLoading(false));
+    
+    axios.get(`${API_URL}/api/products`)
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setProducts(res.data);
+        } else {
+          setProducts([]);
+        }
+      })
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  // --- LÓGICA DE FILTRADO ---
-  const handleFilterChange = (category) => {
-    const lowerCaseCategory = category.toLowerCase();
-    
+  const handleFilterChange = (filterKey) => {
     setActiveFilters(prevFilters =>
-      prevFilters.includes(lowerCaseCategory)
-        ? prevFilters.filter(c => c !== lowerCaseCategory) // Si ya está, la quita
-        : [...prevFilters, lowerCaseCategory] // Si no está, la añade
+      prevFilters.includes(filterKey)
+        ? prevFilters.filter(k => k !== filterKey)
+        : [...prevFilters, filterKey]
     );
   };
 
-  // Filtra los productos basándose en los filtros activos y el término de búsqueda
   const filteredProducts = products.filter(product => {
-    const matchesCategory = activeFilters.length === 0 || 
+    // Filtra por categoría
+    const matchesCategory = activeFilters.length === 0 ||
       (product.category && activeFilters.includes(product.category.toLowerCase()));
     
-    const matchesSearch = searchTerm.trim() === "" || 
+    // Filtra por término de búsqueda
+    const matchesSearch = searchTerm.trim() === "" ||
       product.name.toLowerCase().includes(searchTerm.toLowerCase());
       
     return matchesCategory && matchesSearch;
   });
-
-  // --- RENDERIZADO DEL COMPONENTE ---
-  if (loading) {
-    return <div className="text-center py-5 fw-bold fs-4">Cargando...</div>;
-  }
 
   return (
     <div className="shop-bg-gradient min-vh-100 pt-5">
@@ -74,15 +81,16 @@ export default function Shop() {
 
             <h2 className="fw-black fs-4 text-primary mb-3">Filtrar por Categoría</h2>
             <div className="d-flex flex-column gap-2 fw-medium text-secondary">
-              {categories.map((category) => (
-                <label key={category} className="d-flex align-items-center pointer text-capitalize">
+              {/* --- 3. SE RENDERIZA LA LISTA ESTÁTICA --- */}
+              {FILTERS.map(({ key, label }) => (
+                <label key={key} className="d-flex align-items-center pointer">
                   <input
                     type="checkbox"
                     className="form-check-input me-2 accent-warning"
-                    checked={activeFilters.includes(category.toLowerCase())}
-                    onChange={() => handleFilterChange(category)}
+                    checked={activeFilters.includes(key)}
+                    onChange={() => handleFilterChange(key)}
                   />
-                  {category}
+                  {label}
                 </label>
               ))}
             </div>
@@ -95,7 +103,11 @@ export default function Shop() {
             <span className="text-secondary small">{filteredProducts.length} productos</span>
           </div>
 
-          {filteredProducts.length > 0 ? (
+          {loading ? (
+            <div className="text-primary fw-bold fs-4 py-5 text-center">Cargando productos...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-muted py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
+          ) : (
             <div className="row g-3 animate-fade-in">
               {filteredProducts.slice(0, visible).map(product => (
                 <div className="col-12 col-sm-6 col-md-4" key={product.id}>
@@ -103,8 +115,6 @@ export default function Shop() {
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-muted py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
           )}
 
           {visible < filteredProducts.length && (
