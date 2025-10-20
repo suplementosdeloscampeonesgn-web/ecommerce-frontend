@@ -13,6 +13,7 @@ import Cart from './components/Cart';
 import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import OrderConfirmation from './pages/OrderConfirmation'; // <-- 1. Se importa la nueva página
 
 // --- COMPONENTES Y PÁGINAS DE ADMINISTRACIÓN ---
 import PrivateRoute from './components/PrivateRoute';
@@ -47,7 +48,10 @@ function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              {/* ✅ 2. Se añade la nueva ruta para la confirmación del pedido */}
+              <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
             </Route>
+            
             {/* --- RUTAS PRIVADAS DE ADMINISTRACIÓN (con su propio layout) --- */}
             <Route
               path="/admin"
@@ -61,6 +65,7 @@ function App() {
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
             </Route>
+
             {/* Página no encontrada */}
             {/* <Route path="*" element={<NotFoundPage />} /> */}
           </Routes>
