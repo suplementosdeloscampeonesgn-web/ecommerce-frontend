@@ -98,9 +98,8 @@ export default function Checkout() {
       })) : [],
     };
 
-    console.log("orderData enviado:", orderData); // DEBUG PARA VER LO QUE ENVÍAS
+    console.log("orderData enviado:", orderData);
 
-    // Verifica datos obligatorios antes de enviar
     if (!orderData.payment_method || !orderData.shipping_address || !orderData.shipping_type || orderData.items.length === 0) {
       setError("Faltan datos obligatorios en tu pedido.");
       setIsLoading(false);
@@ -108,8 +107,14 @@ export default function Checkout() {
     }
 
     try {
-      const API_URL = `${import.meta.env.VITE_API_URL}/api/orders`;
-      const response = await axios.post(API_URL, orderData);
+      // Captura el token guardado en el Login (asegúrate que así lo guardas)
+      const token = localStorage.getItem("access_token");
+      const API_URL = `${import.meta.env.VITE_API_URL}/api/orders/`;
+      const response = await axios.post(API_URL, orderData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       const newOrder = response.data;
       clearCart();
       navigate(`/order-confirmation/${newOrder.id}`, {
