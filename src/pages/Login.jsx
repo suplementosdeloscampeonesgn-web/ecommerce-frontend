@@ -35,7 +35,12 @@ function Login() {
         role: decodedToken.role,
         email: decodedToken.sub, // 'sub' (subject) es el estándar para el ID de usuario en JWT
       };
+
+         // Guarda el JWT para los requests futuros
+    localStorage.setItem("access_token", accessToken);
       
+
+
       login(userData); // Actualiza el estado global de autenticación
 
       // Redirige usando navigate para una experiencia de SPA fluida
