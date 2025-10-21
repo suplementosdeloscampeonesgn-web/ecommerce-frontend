@@ -5,7 +5,12 @@ import axios from 'axios';
 
 const BRANCH_ADDRESS = "Av Vicente Rivera 131 A, Col. Nuevo Paseo, 78437, SLP";
 const BRANCH_MAPS_URL = "https://www.google.com/maps?q=Av+Vicente+Rivera+131+A,+Col.+Nuevo+Paseo,+78437,+SLP";
-const SLP_POSTAL_CODES = ["78437", "78000", "78010"]; // agrega los de SLP aquí si amplías
+const SLP_POSTAL_CODES = [
+  "78000", "78010", "78013", "78015", "78017", "78020", "78030", "78039", "78040",
+  "78049", "78050", "78056", "78057", "78110", "78120", "78200", "78210", "78216",
+  "78230", "78238", "78394", "78395", "78396", "78399", "78437"
+];
+const SLP_CAPITAL = "san luis potosi";
 
 export default function Checkout() {
   const { cart, clearCart } = useCart();
@@ -23,7 +28,6 @@ export default function Checkout() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Bloqueo si el carrito está vacío
   if (cart.items.length === 0) {
     return (
       <div className="text-center py-5">
@@ -44,22 +48,38 @@ export default function Checkout() {
     });
   };
 
-  const handlePostalChange = (e) => {
-    const postal = e.target.value;
-    setForm({ ...form, postal });
-
-    if (shippingType === "delivery") {
-      if (!SLP_POSTAL_CODES.includes(postal)) {
-        setShippingCost(249);
+  const updateShippingCost = (postal, city = "") => {
+    const cpSLP = SLP_POSTAL_CODES.includes(postal);
+    const ciudadSLP = city.trim().toLowerCase() === SLP_CAPITAL;
+    if (cpSLP || ciudadSLP) {
+      if (postal === "78396" || postal === "78437" || postal === "78000") {
+        setShippingCost(49);
       } else {
-        setShippingCost(postal === "78437" ? 50 : 100);
+        setShippingCost(99);
       }
+    } else {
+      setShippingCost(249);
     }
   };
 
-  // Resumen completo de dirección que va para backend
+  const handlePostalChange = (e) => {
+    const postal = e.target.value;
+    setForm(prev => ({ ...prev, postal }));
+    if (shippingType === "delivery") {
+      updateShippingCost(postal, form.city);
+    }
+  };
+
+  const handleCityChange = (e) => {
+    const city = e.target.value;
+    setForm(prev => ({ ...prev, city }));
+    if (shippingType === "delivery") {
+      updateShippingCost(form.postal, city);
+    }
+  };
+
   const shippingAddress = shippingType === "branch"
-    ? `Sucursal: ${BRANCH_ADDRESS}` 
+    ? `Sucursal: ${BRANCH_ADDRESS}`
     : `${form.address}, CP: ${form.postal}, ${form.city}, ${form.state}`;
 
   const handleSubmit = async (e) => {
@@ -67,28 +87,34 @@ export default function Checkout() {
     setIsLoading(true);
     setError('');
 
-    // 1. Preparamos los datos que espera el backend
     const orderData = {
-      payment_method: paymentMethod,
-      shipping_address: shippingAddress,
-      shipping_type: shippingType,
-      shipping_cost: shippingCost || 0,
-      items: cart.items.map(item => ({
+      payment_method: paymentMethod ?? "transferencia",
+      shipping_address: shippingAddress ?? "",
+      shipping_type: shippingType ?? "branch",
+      shipping_cost: typeof shippingCost === "number" ? shippingCost : 0,
+      items: Array.isArray(cart.items) && cart.items.length > 0 ? cart.items.map(item => ({
         product_id: item.id,
         quantity: item.quantity,
-      })),
+      })) : [],
     };
+
+    console.log("orderData enviado:", orderData); // DEBUG PARA VER LO QUE ENVÍAS
+
+    // Verifica datos obligatorios antes de enviar
+    if (!orderData.payment_method || !orderData.shipping_address || !orderData.shipping_type || orderData.items.length === 0) {
+      setError("Faltan datos obligatorios en tu pedido.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const API_URL = `${import.meta.env.VITE_API_URL}/api/orders`;
       const response = await axios.post(API_URL, orderData);
-
       const newOrder = response.data;
       clearCart();
-      navigate(`/order-confirmation/${newOrder.id}`, { 
-        state: { paymentMethod: newOrder.payment_method } 
+      navigate(`/order-confirmation/${newOrder.id}`, {
+        state: { paymentMethod: newOrder.payment_method }
       });
-
     } catch (err) {
       setError(err.response?.data?.detail || "Hubo un error al procesar tu pedido. Inténtalo de nuevo.");
     } finally {
@@ -101,8 +127,6 @@ export default function Checkout() {
       <h1 className="text-center fw-bolder mb-5 text-primary">Finalizar Compra</h1>
       <form onSubmit={handleSubmit}>
         <div className="row g-5">
-
-          {/* Columna Formulario */}
           <div className="col-lg-7">
             <h3 className="fw-bold mb-4">Opciones de Entrega</h3>
             <div className="d-flex gap-4 mb-4">
@@ -121,8 +145,6 @@ export default function Checkout() {
                 Envío a domicilio
               </button>
             </div>
-
-            {/* Recoger en sucursal */}
             {shippingType === "branch" && (
               <div className="border rounded p-3 mb-4 bg-light">
                 <p className="mb-1"><strong>Dirección sucursal:</strong></p>
@@ -137,8 +159,6 @@ export default function Checkout() {
                 </a>
               </div>
             )}
-
-            {/* Envío a domicilio */}
             {shippingType === "delivery" && (
               <div className="border rounded p-3 mb-4 bg-light">
                 <div className="mb-2">
@@ -157,7 +177,7 @@ export default function Checkout() {
                     type="text"
                     className="form-control"
                     value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}
                     required
                   />
                 </div>
@@ -167,7 +187,7 @@ export default function Checkout() {
                     type="text"
                     className="form-control"
                     value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    onChange={handleCityChange}
                     required
                   />
                 </div>
@@ -177,7 +197,7 @@ export default function Checkout() {
                     type="text"
                     className="form-control"
                     value={form.state}
-                    onChange={(e) => setForm({ ...form, state: e.target.value })}
+                    onChange={e => setForm(prev => ({ ...prev, state: e.target.value }))}
                     required
                   />
                 </div>
@@ -188,7 +208,6 @@ export default function Checkout() {
                 )}
               </div>
             )}
-
             <h3 className="fw-bold mt-5 mb-4">Método de Pago</h3>
             <div className="list-group">
               <label className="list-group-item d-flex gap-3">
@@ -221,8 +240,6 @@ export default function Checkout() {
               </label>
             </div>
           </div>
-
-          {/* Columna Resumen Pedido */}
           <div className="col-lg-5">
             <div className="card shadow-sm">
               <div className="card-body">
@@ -254,7 +271,10 @@ export default function Checkout() {
               <button
                 type="submit"
                 className="btn btn-success btn-lg"
-                disabled={isLoading || !shippingType || (shippingType === "delivery" && (!form.postal || !form.address || !form.city || !form.state))}
+                disabled={isLoading ||
+                  !shippingType ||
+                  (shippingType === "delivery" && (!form.postal || !form.address || !form.city || !form.state))
+                }
               >
                 {isLoading ? 'Procesando Pedido...' : 'Realizar Pedido'}
               </button>
