@@ -13,9 +13,11 @@ import Cart from './components/Cart';
 import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import OrderConfirmation from './pages/OrderConfirmation'; // <-- 1. Se importa la nueva página
+import Profile from './pages/Profile';
+import OrderConfirmation from './pages/OrderConfirmation';
+import OrderDetail from './components/profile/OrderDetail';  // ✅ nuevo
 
-// --- COMPONENTES Y PÁGINAS DE ADMINISTRACIÓN ---
+// --- ADMINISTRACIÓN ---
 import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './pages/Admin/AdminLayout';
 import DashboardPage from './pages/Admin/DashboardPage';
@@ -39,7 +41,7 @@ function App() {
       <CartProvider>
         <ProductProvider>
           <Routes>
-            {/* --- RUTAS PÚBLICAS (con Header y Footer) --- */}
+            {/* --- RUTAS PÚBLICAS CON HEADER Y FOOTER --- */}
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/shop" element={<Shop />} />
@@ -48,11 +50,12 @@ function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              {/* ✅ 2. Se añade la nueva ruta para la confirmación del pedido */}
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/order-detail/:orderId" element={<OrderDetail />} /> {/* ✅ Detalle de pedido fuera del perfil */}
               <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
             </Route>
-            
-            {/* --- RUTAS PRIVADAS DE ADMINISTRACIÓN (con su propio layout) --- */}
+
+            {/* --- RUTAS PRIVADAS DE ADMINISTRACIÓN --- */}
             <Route
               path="/admin"
               element={
@@ -65,9 +68,6 @@ function App() {
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
             </Route>
-
-            {/* Página no encontrada */}
-            {/* <Route path="*" element={<NotFoundPage />} /> */}
           </Routes>
         </ProductProvider>
       </CartProvider>

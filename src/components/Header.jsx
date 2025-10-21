@@ -7,45 +7,102 @@ export default function Header() {
 
   return (
     <header className="sticky-top z-3 bg-white-blur border-bottom shadow-sm transition">
-      <nav className="container d-flex align-items-center justify-content-between" style={{ height: "80px", maxWidth: "1100px" }}>
-        {/* SOLO TEXTO, SIN LOGO */}
-        <Link to="/" className="fw-bold fs-3 text-primary text-decoration-none">
+      <nav
+        className="container d-flex align-items-center justify-content-between flex-wrap"
+        style={{ height: "80px", maxWidth: "1100px" }}
+      >
+        {/* Logo principal */}
+        <Link
+          to="/"
+          className="fw-bold fs-3 text-primary text-decoration-none"
+        >
           Suplementos de los Campeones <span className="text-warning">GN</span>
         </Link>
+
+        {/* Navegación principal */}
         <ul className="d-none d-md-flex gap-4 fs-5 fw-semibold text-secondary mb-0">
-          <li><Link to="/" className="nav-link px-0 link-secondary hover-primary">Inicio</Link></li>
-          <li><Link to="/shop" className="nav-link px-0 link-secondary hover-primary">Tienda</Link></li>
           <li>
-            <Link to="/cart" className="nav-link px-0 d-flex align-items-center gap-1 link-danger hover-pink">
-              <svg style={{ width: "24px", height: "24px" }} fill="none" stroke="currentColor" strokeWidth="2"
-                viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4"
-                strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+            <Link to="/" className="nav-link px-0 link-secondary hover-primary">
+              Inicio
+            </Link>
+          </li>
+          <li>
+            <Link to="/shop" className="nav-link px-0 link-secondary hover-primary">
+              Tienda
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/cart"
+              className="nav-link px-0 d-flex align-items-center gap-1 link-danger hover-pink"
+            >
+              <svg
+                style={{ width: "24px", height: "24px" }}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+              </svg>
               Carrito
             </Link>
           </li>
         </ul>
-        
-        {/* Botones condicionales de usuario, igual que antes */}
+
+        {/* Área de usuario/derecha */}
         <div className="d-flex align-items-center gap-2">
           {!user ? (
             <>
-              <Link to="/login" className="px-4 py-2 text-white rounded bg-primary shadow fw-bold">
+              <Link
+                to="/login"
+                className="px-4 py-2 text-white rounded bg-primary shadow fw-bold"
+              >
                 Iniciar sesión
               </Link>
-              <Link to="/register" className="px-3 py-2 bg-success text-white rounded shadow fw-bold">
+              <Link
+                to="/register"
+                className="px-3 py-2 bg-success text-white rounded shadow fw-bold"
+              >
                 Crear cuenta
               </Link>
             </>
           ) : (
             <>
-              <span className="text-secondary">Hola, {user.email || user.name}</span>
+              <span className="text-secondary d-none d-md-block">
+                Hola, {user.email || user.name}
+              </span>
+
+              {/* Botón de Perfil */}
+              <Link
+                to="/profile"
+                className="bg-light border rounded-circle p-2 d-flex align-items-center justify-content-center text-secondary"
+                style={{ width: 40, height: 40 }}
+                title="Perfil"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" className="bi bi-person-circle" viewBox="0 0 16 16">
+                  <path d="M11 10a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"/>
+                  <path fillRule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-7a7 7 0 0 0 0 14A7 7 0 0 0 8 1Z"/>
+                </svg>
+              </Link>
+
               {user.is_admin && (
-                <Link to="/admin" className="px-3 py-2 bg-warning text-dark rounded shadow fw-bold">
+                <Link
+                  to="/admin"
+                  className="px-3 py-2 bg-warning text-dark rounded shadow fw-bold"
+                >
                   Admin
                 </Link>
               )}
-              <button 
-                onClick={logout} 
+
+              <button
+                onClick={logout}
                 className="px-3 py-2 bg-danger text-white rounded shadow fw-bold border-0"
               >
                 Cerrar sesión
