@@ -6,39 +6,37 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { Visibility as ViewIcon, Search as SearchIcon } from '@mui/icons-material';
-import axios from 'axios'; // Se importa Axios para las llamadas reales a la API
+import axios from 'axios';
 
 // --- CONFIGURACIÓN DE LA API ---
-// ✅ CORRECCIÓN: Se define la URL base de la API usando variables de entorno
-const API_URL = `${import.meta.env.VITE_API_URL}/api/admin/orders`;
+const API_URL = `${import.meta.env.VITE_API_URL}/api/orders/admin`;
 
-// --- FUNCIONES DE API REALES ---
+// --- FUNCIONES DE API ---
 const fetchOrdersApi = async () => {
+  const token = localStorage.getItem("access_token");
   const response = await axios.get(API_URL, {
-    // Aquí puedes añadir headers de autorización si los necesitas
-    // headers: { 'Authorization': `Bearer ${token}` }
+    headers: { 'Authorization': `Bearer ${token}` }
   });
   return response.data;
 };
 
 const updateOrderStatusApi = async (orderId, newStatus) => {
-  // El ID del pedido usualmente contiene caracteres que deben ser codificados en una URL
-  const encodedOrderId = encodeURIComponent(orderId);
-  const response = await axios.patch(`${API_URL}/${encodedOrderId}`, { status: newStatus });
+  const token = localStorage.getItem("access_token");
+  const response = await axios.patch(
+    `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`, 
+    { status: newStatus },
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
   return response.data;
 };
 
-
-// --- DATOS Y CONFIGURACIÓN VISUAL ---
-const statusOptions = ['Pendiente', 'Procesando', 'Enviado', 'Completado', 'Cancelado'];
+const statusOptions = ['PENDING', 'PROCESANDO', 'ENVIADO', 'COMPLETADO', 'CANCELADO'];
 const statusChipColor = {
-  'Completado': 'success', 'Enviado': 'info', 'Procesando': 'primary', 
-  'Pendiente': 'warning', 'Cancelado': 'error',
+  'COMPLETADO': 'success', 'ENVIADO': 'info', 'PROCESANDO': 'primary', 
+  'PENDING': 'warning', 'CANCELADO': 'error',
 };
 
-
 function OrdersPage() {
-  // --- ESTADOS DEL COMPONENTE ---
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,20 +45,16 @@ function OrdersPage() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [searchText, setSearchText] = useState('');
 
-  // --- EFECTOS ---
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
+  useEffect(() => { loadOrders(); }, []);
   useEffect(() => {
     const filtered = orders.filter(order => 
       (order.id?.toString().toLowerCase() || '').includes(searchText.toLowerCase()) ||
-      (order.customer?.name?.toLowerCase() || '').includes(searchText.toLowerCase())
+      (order.user?.name?.toLowerCase() || '').includes(searchText.toLowerCase()) ||
+      (order.user?.email?.toLowerCase() || '').includes(searchText.toLowerCase())
     );
     setFilteredOrders(filtered);
   }, [searchText, orders]);
 
-  // --- MANEJADORES DE LÓGICA ---
   const loadOrders = async () => {
     setLoading(true);
     try {
@@ -92,57 +86,60 @@ function OrdersPage() {
       setSnackbar({ open: true, message: 'Error al actualizar el estado', severity: 'error' });
     }
   };
-  
-  // El resto del componente (columnas y JSX) permanece igual...
-  
+
   const columns = [
-     { field: 'id', headerName: 'ID Pedido', width: 120 },
-     { 
-       field: 'customerName', 
-       headerName: 'Cliente', 
-       width: 200,
-       valueGetter: (value, row) => row.customer?.name || ''
-     },
-     { 
-       field: 'date', 
-       headerName: 'Fecha', 
-       width: 180, 
-       type: 'dateTime',
-       valueGetter: (value, row) => new Date(row.date) 
-     },
-     { 
-       field: 'total', 
-       headerName: 'Total', 
-       width: 120, 
-       type: 'number',
-       renderCell: (params) => <Typography>{`$${params.value.toFixed(2)}`}</Typography>
-     },
-     {
-       field: 'status',
-       headerName: 'Estado',
-       width: 150,
-       renderCell: (params) => (
-         <Chip 
-           label={params.value} 
-           color={statusChipColor[params.value] || 'default'} 
-           size="small"
-           onClick={(e) => handleStatusMenuOpen(e, params.row.id)}
-           sx={{ cursor: 'pointer', textTransform: 'capitalize', fontWeight: 'bold' }}
-         />
-       ),
-     },
-     {
-       field: 'actions',
-       headerName: 'Acciones',
-       sortable: false,
-       filterable: false,
-       width: 120,
-       renderCell: (params) => (
-         <Button startIcon={<ViewIcon />} onClick={() => handleViewDetails(params.row)} size="small">
-           Detalles
-         </Button>
-       ),
-     },
+    { field: 'id', headerName: 'ID Pedido', width: 100 },
+    { 
+      field: 'user', 
+      headerName: 'Cliente', 
+      width: 200,
+      renderCell: (params) => (
+        <span>
+          {params.row.user?.name || "SIN NOMBRE"}<br />
+          <small>{params.row.user?.email}</small>
+        </span>
+      )
+    },
+    { 
+      field: 'created_at', 
+      headerName: 'Fecha', 
+      width: 180, 
+      type: 'dateTime',
+      valueGetter: (params) => new Date(params.value)
+    },
+    { 
+      field: 'total_amount', 
+      headerName: 'Total', 
+      width: 110, 
+      type: 'number',
+      renderCell: (params) => <Typography>${Number(params.value).toFixed(2)}</Typography>
+    },
+    {
+      field: 'status',
+      headerName: 'Estado',
+      width: 140,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value} 
+          color={statusChipColor[params.value] || 'default'} 
+          size="small"
+          onClick={(e) => handleStatusMenuOpen(e, params.row.id)}
+          sx={{ cursor: 'pointer', textTransform: 'capitalize', fontWeight: 'bold' }}
+        />
+      ),
+    },
+    {
+      field: 'actions',
+      headerName: 'Acciones',
+      sortable: false,
+      filterable: false,
+      width: 120,
+      renderCell: (params) => (
+        <Button startIcon={<ViewIcon />} onClick={() => handleViewDetails(params.row)} size="small">
+          Detalles
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -166,6 +163,7 @@ function OrdersPage() {
           rows={filteredOrders}
           columns={columns}
           loading={loading}
+          getRowId={row => row.id}
           pageSizeOptions={[10, 25, 50]}
           initialState={{ pagination: { paginationModel: { pageSize: 10 } }}}
           disableRowSelectionOnClick
@@ -186,27 +184,27 @@ function OrdersPage() {
               <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <Typography variant="h6">Información del Cliente</Typography>
-                  <Typography><b>Nombre:</b> {selectedOrder.customer.name}</Typography>
-                  <Typography><b>Email:</b> {selectedOrder.customer.email}</Typography>
-                  <Typography><b>Dirección de Envío:</b> {selectedOrder.shippingAddress}</Typography>
+                  <Typography><b>Nombre:</b> {selectedOrder.user?.name}</Typography>
+                  <Typography><b>Email:</b> {selectedOrder.user?.email}</Typography>
+                  <Typography><b>Dirección de Envío:</b> {selectedOrder.shipping_address}</Typography>
                 </Grid>
                 <Grid item xs={12}>
                   <Divider sx={{ my: 1 }} />
                   <Typography variant="h6">Productos en el Pedido</Typography>
                   <List dense>
-                    {selectedOrder.products.map(p => (
-                      <ListItem key={p.id}>
+                    {selectedOrder.items.map(item => (
+                      <ListItem key={item.id}>
                         <ListItemText 
-                          primary={`${p.name} (x${p.quantity})`}
-                          secondary={`Precio unitario: $${p.price.toFixed(2)}`}
+                          primary={`${item.product_name} (x${item.quantity})`}
+                          secondary={`Precio unitario: $${item.product_price.toFixed(2)}`}
                         />
-                        <Typography variant="body1"><b>${(p.quantity * p.price).toFixed(2)}</b></Typography>
+                        <Typography variant="body1"><b>${(item.quantity * item.product_price).toFixed(2)}</b></Typography>
                       </ListItem>
                     ))}
                   </List>
                   <Divider sx={{ my: 1 }} />
                   <Box sx={{ textAlign: 'right', pr: 2 }}>
-                    <Typography variant="h6">Total: ${selectedOrder.total.toFixed(2)}</Typography>
+                    <Typography variant="h6">Total: ${selectedOrder.total_amount.toFixed(2)}</Typography>
                   </Box>
                 </Grid>
               </Grid>
