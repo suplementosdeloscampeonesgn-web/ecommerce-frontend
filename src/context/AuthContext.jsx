@@ -44,8 +44,10 @@ export function AuthProvider({ children }) {
    * El useEffect se encargará de limpiarlo de localStorage.
    */
   const logout = () => {
-    setUser(null);
-  };
+  setUser(null);
+  localStorage.removeItem('access_token'); // <<-- ¡Agrega esto!
+};
+
 
   // 4. Pasamos el estado y las funciones al resto de la app.
   const value = {
