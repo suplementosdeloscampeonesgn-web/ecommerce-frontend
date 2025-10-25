@@ -37,18 +37,20 @@ function Login() {
       };
 
          // Guarda el JWT para los requests futuros
-    localStorage.setItem("access_token", accessToken);
       
 
 
-      login(userData); // Actualiza el estado global de autenticación
+      // ... dentro de handleLoginSuccess
+   login(userData); // Actualiza el estado global de autenticación
 
-      // Redirige usando navigate para una experiencia de SPA fluida
-      if (userData.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+   // Redirige usando navigate para una experiencia de SPA fluida
+   // ✅ SOLUCIÓN: Comprobar en mayúsculas
+   if (userData.role?.toUpperCase() === 'ADMIN') { 
+     navigate('/admin');
+   } else {
+     navigate('/');
+   }
+// ...
     } catch (err) {
       console.error("Error al procesar el token:", err);
       setError("El token recibido no es válido. Inténtalo de nuevo.");
