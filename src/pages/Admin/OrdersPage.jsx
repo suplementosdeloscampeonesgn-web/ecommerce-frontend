@@ -6,19 +6,21 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { Visibility as ViewIcon, Search as SearchIcon } from '@mui/icons-material';
-// ✅ CORREGIDO: Importamos tu nuevo apiClient
+// ✅ CORREGIDO: Importamos tu 'apiClient'
 import apiClient from '../../api/apiClient';
 
-// --- FUNCIONES DE API (Corregidas) ---
+// ❌ CORREGIDO: Eliminamos 'axios' y las URLS_API manuales
 
+// --- FUNCIONES DE API (Corregidas) ---
 const fetchOrdersApi = async () => {
-  // ✅ CORREGIDO: Usamos apiClient, sin token manual, sin headers, sin URL completa
-  const response = await apiClient.get('/api/orders/admin');
+  // ✅ CORREGIDO: Usamos apiClient y la nueva ruta del admin.py
+  const response = await apiClient.get('/api/admin/orders');
   return response.data;
 };
 
 const updateOrderStatusApi = async (orderId, newStatus) => {
-  // ✅ CORREGIDO: Usamos apiClient.patch, sin token, sin headers, sin URL completa
+  // ✅ CORREGIDO: Usamos apiClient.patch.
+  // Esta ruta (del router público) debe estar protegida para admin en tu backend
   const response = await apiClient.patch(
     `/api/orders/${orderId}/status`, 
     { status: newStatus }
@@ -26,7 +28,7 @@ const updateOrderStatusApi = async (orderId, newStatus) => {
   return response.data;
 };
 
-// --- (El resto de tu componente es idéntico) ---
+// --- (El resto de tu componente estaba perfecto) ---
 
 const statusOptions = ['PENDING', 'PROCESANDO', 'ENVIADO', 'COMPLETADO', 'CANCELADO'];
 const statusChipColor = {
