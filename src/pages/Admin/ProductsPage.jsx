@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-// ✅ CORREGIDO: Importamos 'apiClient' y quitamos 'axios'
+// ✅ ESTE ARCHIVO YA ESTABA CORRECTO
 import apiClient from '../../api/apiClient';
 import { 
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle, 
@@ -10,9 +10,6 @@ import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
 import { uploadImage } from '../../utils/uploadImageToFirebase'; // Asumiendo que esta ruta es correcta
-
-// ❌ CORREGIDO: Ya no necesitamos API_URL, está en apiClient
-// const API_URL = `${import.meta.env.VITE_API_URL}/api/products`;
 
 function ProductsPage() {
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm();
@@ -44,19 +41,26 @@ function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // ✅ CORREGIDO: Usamos apiClient y la ruta relativa
+      // Usamos apiClient. El endpoint público /api/products está bien para cargar
       const response = await apiClient.get('/api/products');
       if (Array.isArray(response.data)) {
         setProducts(response.data);
       } else {
-        console.error("La respuesta de la API no es un array válido:", response.data);
-        setProducts([]);
-        setSnackbar({ open: true, message: 'Error: La respuesta del servidor no es válida.', severity: 'error' });
+        // Si la respuesta no es un array, puede que el endpoint admin devuelva un objeto
+        // Asumimos que el admin endpoint es /api/admin/products
+        const adminResponse = await apiClient.get('/api/admin/products');
+        if (adminResponse.data && Array.isArray(adminResponse.data.products)) {
+           setProducts(adminResponse.data.products);
+        } else {
+           console.error("La respuesta de la API no es un array válido:", adminResponse.data);
+           setProducts([]);
+           setSnackbar({ open: true, message: 'Error: La respuesta del servidor no es válida.', severity: 'error' });
+        }
       }
     } catch (error) {
       console.error("Error al cargar productos:", error);
       setProducts([]);
-      // (No mostramos snackbar de error en la carga pública)
+      setSnackbar({ open: true, message: 'Error de red al cargar los productos.', severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -87,30 +91,35 @@ function ProductsPage() {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     let imageUrl = editingProduct?.imageUrl || "";
-    if (data.image && data.image.length > 0) {
-      imageUrl = await uploadImage(data.image[0], "productos");
-    }
     
-    const body = {
-      ...data,
-      image_url: imageUrl,
-      image: undefined
-    };
-
     try {
-      if (editingProduct) {
-        // ✅ CORREGIDO: Usamos apiClient.put, sin URL completa, sin headers
-        await apiClient.put(`/api/products/${editingProduct.id}`, body);
-      } else {
-        // ✅ CORREGIDO: Usamos apiClient.post, sin URL completa, sin headers
-        await apiClient.post('/api/products', body);
+      if (data.image && data.image.length > 0) {
+        console.log("Subiendo nueva imagen a Firebase...");
+        imageUrl = await uploadImage(data.image[0], "productos");
+        console.log("URL de imagen obtenida:", imageUrl);
+        if (!imageUrl) throw new Error("La subida de imagen falló, no se obtuvo URL.");
       }
+      
+      const body = {
+        ...data,
+        image_url: imageUrl, // Esta es la clave que espera el backend
+        image: undefined // No enviar el 'file' object
+      };
+
+      if (editingProduct) {
+        // Usamos la ruta de admin para editar
+        await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
+      } else {
+        // Usamos la ruta de admin para crear
+        await apiClient.post('/api/admin/products', body);
+      }
+      
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
       await loadProducts();
       handleCloseModal();
     } catch (error) {
       console.error("Error al guardar el producto:", error);
-      const errorMessage = error.response?.data?.message || 'Error al guardar el producto.';
+      const errorMessage = error.response?.data?.detail || error.message || 'Error al guardar el producto.';
       setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
       setIsSubmitting(false);
@@ -121,8 +130,8 @@ function ProductsPage() {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       setLoading(true);
       try {
-        // ✅ CORREGIDO: Usamos apiClient.delete
-        await apiClient.delete(`/api/products/${id}`);
+        // Usamos la ruta de admin para eliminar
+        await apiClient.delete(`/api/admin/products/${id}`);
         setSnackbar({ open: true, message: 'Producto eliminado con éxito.', severity: 'warning' });
         await loadProducts();
       } catch (error) {
@@ -144,7 +153,9 @@ function ProductsPage() {
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { 
-      field: 'imageUrl', headerName: 'Imagen', width: 100,
+      field: 'imageUrl', // ✅ Esto es correcto, coincide con el backend
+      headerName: 'Imagen', 
+      width: 100,
       renderCell: (params) => (
         <CardMedia
           component="img"
