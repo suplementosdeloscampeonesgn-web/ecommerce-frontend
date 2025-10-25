@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+// ✅ CORREGIDO: Importamos 'apiClient' y quitamos 'axios'
+import apiClient from '../../api/apiClient';
 import { 
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle, 
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
@@ -8,10 +9,10 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
-import { uploadImage } from '../../utils/uploadImageToFirebase';
+import { uploadImage } from '../../utils/uploadImageToFirebase'; // Asumiendo que esta ruta es correcta
 
-// ✅ CORRECCIÓN: Se define la URL base de la API usando variables de entorno
-const API_URL = `${import.meta.env.VITE_API_URL}/api/products`;
+// ❌ CORREGIDO: Ya no necesitamos API_URL, está en apiClient
+// const API_URL = `${import.meta.env.VITE_API_URL}/api/products`;
 
 function ProductsPage() {
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm();
@@ -43,7 +44,8 @@ function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(API_URL);
+      // ✅ CORREGIDO: Usamos apiClient y la ruta relativa
+      const response = await apiClient.get('/api/products');
       if (Array.isArray(response.data)) {
         setProducts(response.data);
       } else {
@@ -54,7 +56,7 @@ function ProductsPage() {
     } catch (error) {
       console.error("Error al cargar productos:", error);
       setProducts([]);
-      setSnackbar({ open: true, message: 'Error de red al cargar los productos.', severity: 'error' });
+      // (No mostramos snackbar de error en la carga pública)
     } finally {
       setLoading(false);
     }
@@ -97,9 +99,11 @@ function ProductsPage() {
 
     try {
       if (editingProduct) {
-        await axios.put(`${API_URL}/${editingProduct.id}`, body, { headers: { 'Content-Type': 'application/json' } });
+        // ✅ CORREGIDO: Usamos apiClient.put, sin URL completa, sin headers
+        await apiClient.put(`/api/products/${editingProduct.id}`, body);
       } else {
-        await axios.post(API_URL, body, { headers: { 'Content-Type': 'application/json' } });
+        // ✅ CORREGIDO: Usamos apiClient.post, sin URL completa, sin headers
+        await apiClient.post('/api/products', body);
       }
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
       await loadProducts();
@@ -117,7 +121,8 @@ function ProductsPage() {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       setLoading(true);
       try {
-        await axios.delete(`${API_URL}/${id}`);
+        // ✅ CORREGIDO: Usamos apiClient.delete
+        await apiClient.delete(`/api/products/${id}`);
         setSnackbar({ open: true, message: 'Producto eliminado con éxito.', severity: 'warning' });
         await loadProducts();
       } catch (error) {

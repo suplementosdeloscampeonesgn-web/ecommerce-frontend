@@ -6,29 +6,27 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { Visibility as ViewIcon, Search as SearchIcon } from '@mui/icons-material';
-import axios from 'axios';
+// ✅ CORREGIDO: Importamos tu nuevo apiClient
+import apiClient from '../../api/apiClient';
 
-// --- CONFIGURACIÓN DE LA API ---
-const API_URL = `${import.meta.env.VITE_API_URL}/api/orders/admin`;
+// --- FUNCIONES DE API (Corregidas) ---
 
-// --- FUNCIONES DE API ---
 const fetchOrdersApi = async () => {
-  const token = localStorage.getItem("access_token");
-  const response = await axios.get(API_URL, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  // ✅ CORREGIDO: Usamos apiClient, sin token manual, sin headers, sin URL completa
+  const response = await apiClient.get('/api/orders/admin');
   return response.data;
 };
 
 const updateOrderStatusApi = async (orderId, newStatus) => {
-  const token = localStorage.getItem("access_token");
-  const response = await axios.patch(
-    `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`, 
-    { status: newStatus },
-    { headers: { 'Authorization': `Bearer ${token}` } }
+  // ✅ CORREGIDO: Usamos apiClient.patch, sin token, sin headers, sin URL completa
+  const response = await apiClient.patch(
+    `/api/orders/${orderId}/status`, 
+    { status: newStatus }
   );
   return response.data;
 };
+
+// --- (El resto de tu componente es idéntico) ---
 
 const statusOptions = ['PENDING', 'PROCESANDO', 'ENVIADO', 'COMPLETADO', 'CANCELADO'];
 const statusChipColor = {
