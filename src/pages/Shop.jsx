@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import ProductCard from "../components/ProductCard";
+import ProductCard from "../components/ProductCard"; // Asegúrate que este use product.image_url
 
-// --- 1. LISTA ESTÁTICA BASADA EN TU BASE DE DATOS LIMPIA ---
-// El 'key' es en minúsculas para el filtro y el 'label' es para mostrarlo al usuario.
+// Lista estática de filtros (igual que antes)
 const FILTERS = [
   { key: "accesorios", label: "Accesorios" },
   { key: "aminoácidos", label: "Aminoácidos" },
@@ -26,22 +25,26 @@ export default function Shop() {
   const [activeFilters, setActiveFilters] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // --- 2. SE CARGAN ÚNICAMENTE LOS PRODUCTOS ---
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL;
     setLoading(true);
     
-    axios.get(`${API_URL}/api/products`)
+    // ✅ CORREGIDO: Se añade la barra inclinada al final de la URL
+    axios.get(`${API_URL}/api/products/`) 
       .then(res => {
         if (Array.isArray(res.data)) {
           setProducts(res.data);
         } else {
+          console.error("La respuesta de la API no es un array:", res.data); 
           setProducts([]);
         }
       })
-      .catch(() => setProducts([]))
+      .catch((err) => { 
+          console.error("Error al pedir los productos:", err); 
+          setProducts([]);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // El array vacío asegura que esto se ejecute solo una vez al montar
 
   const handleFilterChange = (filterKey) => {
     setActiveFilters(prevFilters =>
@@ -52,17 +55,18 @@ export default function Shop() {
   };
 
   const filteredProducts = products.filter(product => {
-    // Filtra por categoría
+    // Filtrado por categoría
     const matchesCategory = activeFilters.length === 0 ||
       (product.category && activeFilters.includes(product.category.toLowerCase()));
     
-    // Filtra por término de búsqueda
+    // Filtrado por búsqueda
     const matchesSearch = searchTerm.trim() === "" ||
       product.name.toLowerCase().includes(searchTerm.toLowerCase());
       
     return matchesCategory && matchesSearch;
   });
 
+  // (El JSX para renderizar filtros y productos estaba bien)
   return (
     <div className="shop-bg-gradient min-vh-100 pt-5">
       <div className="container d-flex flex-column flex-lg-row gap-4 px-0">
@@ -81,7 +85,6 @@ export default function Shop() {
 
             <h2 className="fw-black fs-4 text-primary mb-3">Filtrar por Categoría</h2>
             <div className="d-flex flex-column gap-2 fw-medium text-secondary">
-              {/* --- 3. SE RENDERIZA LA LISTA ESTÁTICA --- */}
               {FILTERS.map(({ key, label }) => (
                 <label key={key} className="d-flex align-items-center pointer">
                   <input
@@ -104,29 +107,30 @@ export default function Shop() {
           </div>
 
           {loading ? (
-            <div className="text-primary fw-bold fs-4 py-5 text-center">Cargando productos...</div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-muted py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
-          ) : (
-            <div className="row g-3 animate-fade-in">
-              {filteredProducts.slice(0, visible).map(product => (
-                <div className="col-12 col-sm-6 col-md-4" key={product.id}>
-                  <ProductCard product={product} />
-                </div>
-              ))}
-            </div>
-          )}
+             <div className="text-primary fw-bold fs-4 py-5 text-center">Cargando productos...</div>
+           ) : filteredProducts.length === 0 ? (
+             <div className="text-muted py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
+           ) : (
+             <div className="row g-3 animate-fade-in">
+               {filteredProducts.slice(0, visible).map(product => (
+                 <div className="col-12 col-sm-6 col-md-4" key={product.id}>
+                   {/* Asegúrate que ProductCard use product.image_url */}
+                   <ProductCard product={product} /> 
+                 </div>
+               ))}
+             </div>
+           )}
 
-          {visible < filteredProducts.length && (
-            <div className="d-flex justify-content-center mt-5">
-              <button
-                className="btn btn-primary btn-lg fw-bold rounded-pill shop-btn"
-                onClick={() => setVisible(v => v + 8)}
-              >
-                Ver más productos
-              </button>
-            </div>
-          )}
+           {visible < filteredProducts.length && (
+             <div className="d-flex justify-content-center mt-5">
+               <button
+                 className="btn btn-primary btn-lg fw-bold rounded-pill shop-btn"
+                 onClick={() => setVisible(v => v + 8)}
+               >
+                 Ver más productos
+               </button>
+             </div>
+           )}
         </section>
       </div>
     </div>
