@@ -30,20 +30,21 @@ export default function Shop() {
     setLoading(true);
     
     // ✅ CORREGIDO: Se añade la barra inclinada al final de la URL
-    axios.get(`${API_URL}/api/products`) 
-      .then(res => {
-        if (Array.isArray(res.data)) {
-          setProducts(res.data);
-        } else {
-          console.error("La respuesta de la API no es un array:", res.data); 
-          setProducts([]);
-        }
-      })
-      .catch((err) => { 
-          console.error("Error al pedir los productos:", err); 
-          setProducts([]);
-      })
-      .finally(() => setLoading(false));
+    axios.get(`${API_URL}/api/products`)
+  .then(res => {
+    if (Array.isArray(res.data)) {
+      setProducts(res.data);
+    } else {
+      setProducts([]);
+      console.error("La respuesta de la API no es un array:", res.data);
+    }
+  })
+  .catch((err) => {
+    setProducts([]);
+    console.error("Error al pedir los productos:", err);
+  })
+  .finally(() => setLoading(false));
+
   }, []); // El array vacío asegura que esto se ejecute solo una vez al montar
 
   const handleFilterChange = (filterKey) => {
