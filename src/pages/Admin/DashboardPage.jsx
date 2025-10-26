@@ -10,7 +10,7 @@ import {
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-// ✅ CORREGIDO: Importamos tu nuevo apiClient
+// Importamos tu apiClient
 import apiClient from '../../api/apiClient';
 
 const statusChipColor = {
@@ -18,6 +18,7 @@ const statusChipColor = {
   'ENVIADO': 'info',
   'PENDIENTE': 'warning',
   'CANCELADO': 'error',
+  'PROCESANDO': 'primary', // Añadido para consistencia
 };
 
 function StatCard({ title, value, Icon, color }) {
@@ -42,10 +43,7 @@ function DashboardPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // ✅ CORREGIDO:
-        // 1. Usamos 'apiClient' en lugar de 'axios'.
-        // 2. Usamos la ruta relativa (el baseURL está en apiClient).
-        // 3. No necesitamos 'token' ni 'headers', apiClient lo hace solo.
+        // Tu lógica de 'apiClient' ya era correcta.
         const response = await apiClient.get('/api/admin/dashboard');
         
         setDashboardData({
@@ -57,11 +55,12 @@ function DashboardPage() {
           })),
           topProducts: response.data.topProducts.map(p => ({
             ...p,
-            // (Tu URL de placeholder está bien, pero si tienes imágenes reales, deberías usar p.imageUrl)
-            imageUrl: `https://via.placeholder.com/40/${Math.random().toString(16).slice(2, 8)}/FFFFFF?text=${p.name[0] || "P"}`
+            // ✅ CORREGIDO: URL de placeholder rota
+            // Cambiado 'via.placeholder.com' por 'placehold.co'
+            imageUrl: `https://placehold.co/40x40/eeeeee/313131?text=${p.name[0] || "P"}`
           }))
         });
-      } catch (error) { // ✅ CORREGIDO: Capturamos el error para verlo en consola
+      } catch (error) { 
         console.error("Error al cargar los datos del dashboard:", error);
         setDashboardData(null);
       }

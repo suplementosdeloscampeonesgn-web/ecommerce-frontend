@@ -153,7 +153,7 @@ function ProductsPage() {
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { 
-      field: 'imageUrl', // ✅ Esto es correcto, coincide con el backend
+      field: 'image_Url', // ✅ Esto es correcto, coincide con el backend
       headerName: 'Imagen', 
       width: 100,
       renderCell: (params) => (
