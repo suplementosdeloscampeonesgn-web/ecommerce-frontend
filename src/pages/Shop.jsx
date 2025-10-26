@@ -30,7 +30,7 @@ export default function Shop() {
     setLoading(true);
     
     // ✅ CORREGIDO: Se añade la barra inclinada al final de la URL
-    axios.get(`${API_URL}/api/products/`) 
+    axios.get(`${API_URL}/api/products`) 
       .then(res => {
         if (Array.isArray(res.data)) {
           setProducts(res.data);
