@@ -28,7 +28,7 @@ function ProductsPage() {
         sku: '',
         slug: '',
         image_url: null,
-        image: null,
+        image: null, // Campo para el FileList
         is_active: true,
         is_featured: false,
     }
@@ -131,13 +131,17 @@ function ProductsPage() {
       // --- DEBUG --- Sin Archivo o FileList Vacío
       console.log("   > No se detectó archivo válido en imageFile.");
       // Lógica para resetear/restaurar previsualización
+      // Si no estamos editando O si estamos editando pero no hay imagen original, la preview es null
       if (!editingProduct?.image_url) {
            console.log("   > Estableciendo previsualización a null (no hay imagen existente).");
-           setImagePreview(null);
+           // Solo actualiza si no es ya null para evitar re-renders
+           if (imagePreview !== null) {
+               setImagePreview(null);
+           }
       } else {
-           // Si se edita y se quitó un archivo seleccionado, o estado inicial sin archivo, muestra la original
+           // Si estamos editando y hay imagen original, la mostramos
            console.log("   > Restaurando previsualización a imagen original del producto:", editingProduct.image_url);
-           // Solo restaura si la preview actual no es ya la original (evita bucle)
+           // Solo restaura si la preview actual no es ya la original
            if (imagePreview !== editingProduct.image_url) {
                setImagePreview(editingProduct.image_url);
            }
@@ -145,39 +149,44 @@ function ProductsPage() {
     }
      // --- DEBUG --- Fin del Efecto de Previsualización
      console.log("--- useEffect[imageFile]: FIN ---");
-  }, [imageFile, editingProduct, setValue]); // Dependencias: imageFile, editingProduct, setValue
+  }, [imageFile, editingProduct, setValue, imagePreview]); // Añadido imagePreview a dependencias
 
   // Abrir modal (con useCallback)
   const handleOpenModal = useCallback((product = null) => {
     // --- DEBUG --- Abrir Modal
     console.log('--- handleOpenModal: Abriendo modal ---', product ? `Editando ID: ${product.id}` : 'Nuevo producto');
-    reset(); // Resetea estado del formulario ANTES de poner valores
-    // Establece previsualización inicial (URL existente o null) DESPUÉS de reset
-    setImagePreview(product?.image_url || null);
+    // Resetea a los valores por defecto definidos en useForm
+    reset();
     setEditingProduct(product);
 
     if (product) {
       console.log('   > Estableciendo valores del formulario desde producto:', product);
       // Itera sobre el producto y usa setValue
       Object.entries(product).forEach(([key, value]) => {
-         // Asegúrate de que el campo exista en tu useForm defaultValues o register
-         // No intentes establecer 'image' (el FileList)
-         if (key !== 'image') {
+         if (key !== 'image') { // No establecer 'image' (FileList)
             try {
-                setValue(key, value, { shouldValidate: true, shouldDirty: false }); // No marcar como sucio al inicio
+                // Usa los defaultValues de useForm como referencia para saber qué campos existen
+                // Esto es más seguro que solo Object.keys(product)
+                if (key in reset().defaultValues) {
+                     setValue(key, value, { shouldValidate: true, shouldDirty: false });
+                } else {
+                     console.warn(`handleOpenModal: Clave "${key}" del producto no encontrada en defaultValues de useForm.`);
+                }
             } catch (e) {
-                console.warn(`Error setting value for key "${key}":`, e);
+                console.warn(`handleOpenModal: Error estableciendo valor para clave "${key}":`, e);
             }
          }
       });
-      // Asegura que el campo 'image' esté vacío al editar
+      // Establece la previsualización inicial después de poner los valores
+      setImagePreview(product.image_url || null);
+       // Asegura que el campo 'image' (FileList) esté vacío al editar
       setValue('image', null);
     } else {
-        // Resetea a valores por defecto definidos en useForm para nuevo producto
-        reset();
-        setValue('id', null); // Asegura que id sea null
-        setValue('image', null); // Asegura que imagen sea null
-        setImagePreview(null); // Asegura que preview sea null
+        // Para nuevo producto, asegúrate de que todo esté limpio (reset ya lo hace)
+        setImagePreview(null);
+        setValue('id', null);
+        setValue('image', null);
+        setValue('image_url', null); // Asegura que image_url sea null
     }
     setIsModalOpen(true);
   }, [reset, setValue]); // Dependencias: reset, setValue
@@ -220,25 +229,29 @@ function ProductsPage() {
         finalImageUrl = uploadedUrl; // Actualiza con la nueva URL
       } else {
         // --- DEBUG --- Sin Nueva Imagen
-        console.log("   > No se seleccionó archivo nuevo. Usando URL previa/existente:", finalImageUrl);
+        console.log("   > No se seleccionó archivo nuevo.");
         // Verifica si el usuario quitó explícitamente la imagen
-        // (handleRemoveImage puede poner image_url = null en el estado del form 'data')
-        if (data.image_url === null || data.image_url === '') {
-             console.log("   > Imagen explícitamente eliminada por el usuario.");
-             finalImageUrl = data.image_url; // Usa el valor vacío/nulo
+        // Usamos el valor del form 'data.image_url' que handleRemoveImage pudo haber puesto a null
+        if (data.image_url === null) {
+             console.log("   > Imagen explícitamente eliminada por el usuario (image_url es null en form). Usando null.");
+             finalImageUrl = null;
+        } else {
+             console.log("   > Manteniendo URL previa/existente:", finalImageUrl);
         }
       }
 
       // Prepara el payload para la API Backend
       const body = {
         ...data, // Incluye todos los campos del formulario
-        image_url: finalImageUrl, // Envía la URL correcta
+        image_url: finalImageUrl, // Envía la URL correcta (puede ser null si se quitó)
         image: undefined // IMPORTANTE: No enviar el objeto FileList
       };
-      // Elimina campos que no quieras enviar si es necesario (ej. si 'id' no debe ir en POST)
+      // Elimina campos que no quieras enviar (ej. 'id' al crear)
       if (!editingProduct) {
           delete body.id;
       }
+      // Elimina 'image' del body por si acaso (aunque ya es undefined)
+      delete body.image;
 
       // --- DEBUG --- Payload enviado a la API
       console.log('   > Payload para la API:', body);
@@ -262,7 +275,7 @@ function ProductsPage() {
       handleCloseModal();
     } catch (error) {
       // --- DEBUG --- Error en Submit
-      console.error("--- onSubmit: ERROR ---", error.response?.data || error.message);
+      console.error("--- onSubmit: ERROR ---", error.response?.data || error);
       const errorMessage = error.response?.data?.detail || error.message || 'Error desconocido al guardar.';
       setSnackbar({ open: true, message: `Error: ${errorMessage}`, severity: 'error' });
     } finally {
@@ -277,8 +290,7 @@ function ProductsPage() {
     // --- DEBUG --- Inicio de Borrado
     console.log(`--- handleDelete: Intentando borrar producto ID: ${id} ---`);
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-      // Considera usar estado específico como `isDeleting`
-      setLoading(true); // O un estado específico: setIsDeleting(id)
+      setLoading(true);
       try {
         // --- DEBUG --- Llamando API DELETE
         console.log(`   > Llamando DELETE /api/admin/products/${id}`);
@@ -294,7 +306,7 @@ function ProductsPage() {
       } finally {
         // --- DEBUG --- Fin de Borrado
         console.log(`--- handleDelete: Finalizado para ID: ${id} ---`);
-        setLoading(false); // O setIsDeleting(null)
+        setLoading(false);
       }
     } else {
       // --- DEBUG --- Borrado Cancelado
@@ -305,22 +317,20 @@ function ProductsPage() {
   // Quitar imagen seleccionada/previsualizada (con useCallback)
   const handleRemoveImage = useCallback(() => {
     // --- DEBUG --- Quitar Imagen
-    console.log('--- handleRemoveImage: Quitando imagen seleccionada/previsualizada ---');
+    console.log('--- handleRemoveImage: Quitando imagen ---');
     setImagePreview(null);
-    setValue('image', null, { shouldDirty: true }); // Limpia estado RHF, marca como sucio
+    setValue('image', null, { shouldDirty: true }); // Limpia FileList de RHF
     if (fileInputRef.current) {
       console.log('   > Limpiando valor del input de archivo.');
       fileInputRef.current.value = ''; // Limpia input del DOM
     }
-    // Si se edita, establece image_url a null en el form para señalar eliminación al guardar
-    if (editingProduct) {
-        console.log('   > Estableciendo image_url a null en el estado del form.');
-        setValue('image_url', null, { shouldDirty: true }); // Señala eliminación
-    }
-  }, [setValue, editingProduct]); // Dependencias: setValue, editingProduct
+    // Establece image_url a null en el form para señalar eliminación al guardar
+    console.log('   > Estableciendo image_url a null en el estado del form.');
+    setValue('image_url', null, { shouldDirty: true }); // Señala eliminación
+  }, [setValue]); // Dependencia: setValue
 
-  // Definición de columnas (fuera del render, memoizar con useMemo si es necesario)
-  const columns = React.useMemo(() => [ // Envuelto en useMemo
+  // Definición de columnas con useMemo para optimización
+  const columns = React.useMemo(() => [
     { field: 'id', headerName: 'ID', width: 70 },
     {
       field: 'image_url',
@@ -337,7 +347,7 @@ function ProductsPage() {
       ),
       sortable: false, filterable: false,
     },
-    { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 150 }, // Usa flex para adaptabilidad
+    { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 150 },
     { field: 'brand', headerName: 'Marca', width: 130 },
     {
       field: 'price',
@@ -345,11 +355,11 @@ function ProductsPage() {
       type: 'number',
       width: 110,
       // ✅ CORRECCIÓN toFixed: Verifica si es número antes de formatear
-      valueFormatter: (value) => {
-        if (typeof value === 'number') {
+      valueFormatter: ({ value }) => { // Destructura para obtener value
+        if (typeof value === 'number' && !isNaN(value)) { // Añade chequeo isNaN
           return `$${value.toFixed(2)}`;
         }
-        return '$ --'; // Valor por defecto si no es número
+        return '$ --'; // Valor por defecto si no es número válido
       }
     },
     { field: 'stock', headerName: 'Stock', type: 'number', width: 90 },
@@ -360,15 +370,13 @@ function ProductsPage() {
       width: 130,
       sortable: false,
       filterable: false,
-      // Usar useCallback dentro de useMemo para renderCell
-      renderCell: (params) => (
+      renderCell: (params) => ( // No necesita useCallback aquí si las funciones de fuera lo usan
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <IconButton aria-label="Editar" color="primary" size="small" onClick={() => handleOpenModal(params.row)}><Edit fontSize="small" /></IconButton>
           <IconButton aria-label="Eliminar" color="error" size="small" onClick={() => handleDelete(params.row.id)}><Delete fontSize="small" /></IconButton>
         </Box>
       ),
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [handleDelete, handleOpenModal]); // Dependencias para useMemo
 
   // --- DEBUG --- Log Estado de Carga
@@ -385,13 +393,16 @@ function ProductsPage() {
 
   return (
     <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}> {/* Padding responsivo */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}> {/* Flex wrap */}
+      {/* Encabezado */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>Gestión de Productos</Typography>
         <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenModal()}>
           Añadir Producto
         </Button>
       </Box>
-      <Box sx={{ height: '70vh', width: '100%', backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}> {/* Mejor estilo tabla */}
+
+      {/* Tabla */}
+      <Box sx={{ height: '70vh', width: '100%', backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}>
         <DataGrid
           rows={products}
           columns={columns}
@@ -401,8 +412,9 @@ function ProductsPage() {
           disableRowSelectionOnClick
           getRowId={(row) => row.id}
           onError={(error) => console.error('--- Error DataGrid ---', error)}
-          // Estilos para mejorar visualización
           sx={{ border: 0, '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' } }}
+          // Opcional: localeText para traducir
+          // localeText={esES.components.MuiDataGrid.defaultProps.localeText}
         />
       </Box>
 
@@ -412,12 +424,12 @@ function ProductsPage() {
         {/* --- DEBUG --- Log de estado del form dentro del modal */}
         {isModalOpen && console.log('--- Modal Abierto, Errores RHF:', errors, `Sucio: ${isDirty}, Válido: ${isValid}`)}
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}> {/* Padding responsivo */}
             <Grid container spacing={3}>
               {/* Columna Imagen */}
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1" gutterBottom component="h3">Imagen</Typography>
-                <Card sx={{ width: '100%', aspectRatio: '1 / 1', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, position: 'relative', overflow: 'hidden', backgroundColor: '#f0f0f0' }}>
+                <Card sx={{ width: '100%', aspectRatio: '1 / 1', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, position: 'relative', overflow: 'hidden', backgroundColor: '#f0f0f0', border: errors.image ? '1px solid red' : 'none' }}> {/* Resaltar error */}
                   {imagePreview ? (
                     <>
                       <CardMedia component="img" image={imagePreview} alt="Previsualización" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
@@ -435,7 +447,7 @@ function ProductsPage() {
                     id="image-upload-input"
                     type="file"
                     hidden
-                    accept="image/png, image/jpeg, image/webp, image/gif" // Tipos específicos
+                    accept="image/png, image/jpeg, image/webp, image/gif"
                     // --- DEBUG --- onChange directo en input oculto
                     onChange={(e) => console.log('>>> Input onChange DIRECTO:', e.target.files)}
                     {...register('image')} // Registro RHF
@@ -443,7 +455,6 @@ function ProductsPage() {
                     aria-label="Subir imagen de producto"
                   />
                 </Button>
-                 {/* Mensaje de error para imagen */}
                  {errors.image && <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>{errors.image.message || 'Error en archivo de imagen'}</Typography>}
               </Grid>
               {/* Columna Campos */}
@@ -462,7 +473,7 @@ function ProductsPage() {
                   required
                  />
                 <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}> {/* Grid responsivo */}
+                    <Grid item xs={12} sm={6}>
                         <TextField
                         {...register('price', {
                             required: 'El precio es obligatorio', valueAsNumber: true,
@@ -474,7 +485,7 @@ function ProductsPage() {
                         required
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}> {/* Grid responsivo */}
+                    <Grid item xs={12} sm={6}>
                         <TextField
                         {...register('stock', {
                             required: 'El stock es obligatorio', valueAsNumber: true,
@@ -496,7 +507,7 @@ function ProductsPage() {
                 />
                 <TextField {...register('sku')} label="SKU" fullWidth margin="dense" helperText="Código único (opcional)"/>
                 <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar (recomendado)"/>
-                {/* Checkbox opcionales */}
+                {/* Checkbox opcionales - Descomentar si los necesitas */}
                 {/*
                 <FormControlLabel control={<Checkbox {...register('is_active')} defaultChecked={editingProduct ? editingProduct.is_active : true} />} label="Activo" sx={{mt: 1}}/>
                 <FormControlLabel control={<Checkbox {...register('is_featured')} defaultChecked={editingProduct?.is_featured || false} />} label="Destacado" sx={{mt: 1}}/>
@@ -527,7 +538,7 @@ function ProductsPage() {
          <Alert
            onClose={() => setSnackbar({ ...snackbar, open: false })}
            severity={snackbar.severity} sx={{ width: '100%' }}
-           variant="filled"
+           variant="filled" // Hacerla más visible
          >
            {snackbar.message}
          </Alert>
