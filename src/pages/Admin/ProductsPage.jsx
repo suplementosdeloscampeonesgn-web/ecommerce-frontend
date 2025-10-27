@@ -166,8 +166,7 @@ function ProductsPage() {
          if (key !== 'image') { // No establecer 'image' (FileList)
             try {
                 // Usa los defaultValues de useForm como referencia para saber qué campos existen
-                // Esto es más seguro que solo Object.keys(product)
-                if (key in reset().defaultValues) {
+                if (key in reset().defaultValues) { // <-- Corrección: Llama a reset() para obtener defaultValues
                      setValue(key, value, { shouldValidate: true, shouldDirty: false });
                 } else {
                      console.warn(`handleOpenModal: Clave "${key}" del producto no encontrada en defaultValues de useForm.`);
@@ -327,7 +326,7 @@ function ProductsPage() {
     // Establece image_url a null en el form para señalar eliminación al guardar
     console.log('   > Estableciendo image_url a null en el estado del form.');
     setValue('image_url', null, { shouldDirty: true }); // Señala eliminación
-  }, [setValue]); // Dependencia: setValue
+  }, [setValue]); // Dependencia: setValue (quitamos editingProduct, ya no es necesario aquí)
 
   // Definición de columnas con useMemo para optimización
   const columns = React.useMemo(() => [
@@ -340,7 +339,7 @@ function ProductsPage() {
         <CardMedia
           component="img"
           sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
-          image={params.value || 'https://via.placeholder.com/60?text=No+Img'}
+          image={params.value || 'https://via.placeholder.com/60?text=No+Img'} // Placeholder URL ajustada
           alt="Imagen Producto"
           onError={(e) => { e.target.onerror = null; e.target.src='https://via.placeholder.com/60?text=Error'; console.warn(`Fallo al cargar imagen: ${params.value}`) }}
         />
@@ -354,7 +353,7 @@ function ProductsPage() {
       headerName: 'Precio ($)',
       type: 'number',
       width: 110,
-      // ✅ CORRECCIÓN toFixed: Verifica si es número antes de formatear
+      // ✅ CORRECCIÓN toFixed APLICADA AQUÍ: Verifica si es número válido
       valueFormatter: ({ value }) => { // Destructura para obtener value
         if (typeof value === 'number' && !isNaN(value)) { // Añade chequeo isNaN
           return `$${value.toFixed(2)}`;
@@ -377,6 +376,7 @@ function ProductsPage() {
         </Box>
       ),
     },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [handleDelete, handleOpenModal]); // Dependencias para useMemo
 
   // --- DEBUG --- Log Estado de Carga
@@ -413,8 +413,6 @@ function ProductsPage() {
           getRowId={(row) => row.id}
           onError={(error) => console.error('--- Error DataGrid ---', error)}
           sx={{ border: 0, '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' } }}
-          // Opcional: localeText para traducir
-          // localeText={esES.components.MuiDataGrid.defaultProps.localeText}
         />
       </Box>
 
