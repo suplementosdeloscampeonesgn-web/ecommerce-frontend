@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-// ✅ ESTE ARCHIVO YA ESTABA CORRECTO
-import apiClient from '../../api/apiClient';
-import { 
-  Box, Button, CircularProgress, Typography, Dialog, DialogTitle, 
+import apiClient from '../../api/apiClient'; // Assuming this is your configured Axios instance
+import {
+  Box, Button, CircularProgress, Typography, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
   Card, CardMedia, IconButton
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
-import { uploadImage } from '../../utils/uploadImageToFirebase'; // Asumiendo que esta ruta es correcta
+import { uploadImage } from '../../utils/uploadImageToFirebase'; // Verify this path
 
 function ProductsPage() {
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm();
-  const imageFile = watch('image'); 
+  const imageFile = watch('image');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,35 +26,54 @@ function ProductsPage() {
     loadProducts();
   }, []);
 
+  // --- useEffect with console.log for debugging image preview ---
   useEffect(() => {
+    console.log("useEffect [imageFile] activado. Valor de imageFile:", imageFile); // DEBUG 1
+
     if (imageFile && imageFile.length > 0) {
       const file = imageFile[0];
-      const previewUrl = URL.createObjectURL(file);
-      setImagePreview(previewUrl);
-      return () => URL.revokeObjectURL(previewUrl);
+      console.log("Archivo seleccionado:", file); // DEBUG 2
+
+      try { // Added try...catch for safety
+          const previewUrl = URL.createObjectURL(file);
+          console.log("URL de previsualización creada:", previewUrl); // DEBUG 3
+          setImagePreview(previewUrl);
+
+          // Cleanup function
+          return () => {
+              console.log("Limpiando URL de previsualización:", previewUrl);
+              URL.revokeObjectURL(previewUrl);
+          };
+      } catch (error) {
+          console.error("Error al crear URL de previsualización:", error);
+          setImagePreview(null); // Reset preview on error
+      }
+
     } else {
-      if (!editingProduct?.imageUrl) setImagePreview(null);
+      console.log("imageFile está vacío o nulo.");
+      // Logic to reset preview if no file or editing existing product
+      if (!editingProduct?.imageUrl) {
+           console.log("Limpiando previsualización porque no hay archivo ni imagen existente.");
+           setImagePreview(null);
+      } else if (editingProduct?.imageUrl && !imagePreview) {
+           // If editing and the preview was cleared (e.g., removed new image), restore original
+           console.log("Restaurando previsualización a la imagen original del producto.");
+           setImagePreview(editingProduct.imageUrl);
+      }
     }
-  }, [imageFile, editingProduct]);
+  }, [imageFile, editingProduct]); // Dependencies seem correct
 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Usamos apiClient. El endpoint público /api/products está bien para cargar
-      const response = await apiClient.get('/api/products');
-      if (Array.isArray(response.data)) {
-        setProducts(response.data);
+      // Use the admin endpoint to load products, assuming it requires auth
+      const response = await apiClient.get('/api/admin/products');
+      if (response.data && Array.isArray(response.data)) {
+          setProducts(response.data);
       } else {
-        // Si la respuesta no es un array, puede que el endpoint admin devuelva un objeto
-        // Asumimos que el admin endpoint es /api/admin/products
-        const adminResponse = await apiClient.get('/api/admin/products');
-        if (adminResponse.data && Array.isArray(adminResponse.data.products)) {
-           setProducts(adminResponse.data.products);
-        } else {
-           console.error("La respuesta de la API no es un array válido:", adminResponse.data);
-           setProducts([]);
-           setSnackbar({ open: true, message: 'Error: La respuesta del servidor no es válida.', severity: 'error' });
-        }
+          console.error("La respuesta de la API admin no es un array válido:", response.data);
+          setProducts([]);
+          setSnackbar({ open: true, message: 'Error: La respuesta del servidor no es válida.', severity: 'error' });
       }
     } catch (error) {
       console.error("Error al cargar productos:", error);
@@ -68,12 +86,13 @@ function ProductsPage() {
 
   const handleOpenModal = (product = null) => {
     reset();
-    setImagePreview(null);
+    setImagePreview(null); // Clear preview when opening modal
     setEditingProduct(product);
 
     if (product) {
       Object.keys(product).forEach(key => setValue(key, product[key]));
-      if (product.imageUrl) setImagePreview(product.imageUrl);
+      // Use image_url (lowercase) if that's what your backend provides
+      if (product.image_url) setImagePreview(product.image_url);
     } else {
       setValue('id', null);
     }
@@ -85,37 +104,41 @@ function ProductsPage() {
     setEditingProduct(null);
     reset();
     setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = ''; // Clear file input
   };
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
-    let imageUrl = editingProduct?.imageUrl || "";
-    
+    // Use image_url from editingProduct if available, otherwise start empty
+    let finalImageUrl = editingProduct?.image_url || "";
+
     try {
+      // Check if a new image file was selected
       if (data.image && data.image.length > 0) {
         console.log("Subiendo nueva imagen a Firebase...");
-        imageUrl = await uploadImage(data.image[0], "productos");
-        console.log("URL de imagen obtenida:", imageUrl);
-        if (!imageUrl) throw new Error("La subida de imagen falló, no se obtuvo URL.");
+        const uploadedUrl = await uploadImage(data.image[0], "productos"); // Call your upload function
+        console.log("URL de imagen obtenida:", uploadedUrl);
+        if (!uploadedUrl) throw new Error("La subida de imagen falló, no se obtuvo URL.");
+        finalImageUrl = uploadedUrl; // Update the URL with the newly uploaded one
       }
-      
+
+      // Prepare data for the backend, ensuring image_url is correct
       const body = {
         ...data,
-        image_url: imageUrl, // Esta es la clave que espera el backend
-        image: undefined // No enviar el 'file' object
+        image_url: finalImageUrl, // Use the final URL (new or existing)
+        image: undefined // Remove the FileList object before sending
       };
 
       if (editingProduct) {
-        // Usamos la ruta de admin para editar
+        // Use admin endpoint for updating
         await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
       } else {
-        // Usamos la ruta de admin para crear
+        // Use admin endpoint for creating
         await apiClient.post('/api/admin/products', body);
       }
-      
+
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
-      await loadProducts();
+      await loadProducts(); // Reload products list
       handleCloseModal();
     } catch (error) {
       console.error("Error al guardar el producto:", error);
@@ -128,12 +151,12 @@ function ProductsPage() {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-      setLoading(true);
+      setLoading(true); // Maybe use a different loading state like isDeleting?
       try {
-        // Usamos la ruta de admin para eliminar
+        // Use admin endpoint for deleting
         await apiClient.delete(`/api/admin/products/${id}`);
         setSnackbar({ open: true, message: 'Producto eliminado con éxito.', severity: 'warning' });
-        await loadProducts();
+        await loadProducts(); // Reload products list
       } catch (error) {
         console.error("Error al eliminar el producto:", error);
         setSnackbar({ open: true, message: 'Error al eliminar el producto.', severity: 'error' });
@@ -145,22 +168,25 @@ function ProductsPage() {
 
   const handleRemoveImage = () => {
     setImagePreview(null);
-    setValue('image', null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (editingProduct) setValue('imageUrl', null);
+    setValue('image', null); // Clear the file input in the form state
+    if (fileInputRef.current) fileInputRef.current.value = ''; // Clear the actual file input element
+    // If editing, clear the image_url field as well, maybe? Or keep original? Decide the logic.
+    // Let's assume we want to signal removal by setting image_url to null or empty
+    if (editingProduct) setValue('image_url', null);
   };
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { 
-      field: 'image_Url', // ✅ Esto es correcto, coincide con el backend
-      headerName: 'Imagen', 
+    {
+      field: 'image_url', // Ensure this matches the field name from your API response
+      headerName: 'Imagen',
       width: 100,
       renderCell: (params) => (
         <CardMedia
           component="img"
           sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
-          image={params.value || 'https://via.placeholder.com/60?text=No_Img'}
+          // Use a reliable placeholder URL
+          image={params.value || 'https://via.placeholder.com/60?text=No+Img'}
           alt="Imagen del Producto"
         />
       ),
@@ -206,6 +232,8 @@ function ProductsPage() {
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
           checkboxSelection
           disableRowSelectionOnClick
+          // Make sure getRowId is correct if your ID field is not 'id'
+          // getRowId={(row) => row.id} 
         />
       </Box>
       <Dialog open={isModalOpen} onClose={handleCloseModal} fullWidth maxWidth="md">
@@ -215,11 +243,11 @@ function ProductsPage() {
             <Grid container spacing={3}>
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1" gutterBottom>Imagen</Typography>
-                <Card sx={{ maxWidth: 250, height: 250, display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, position: 'relative' }}>
+                <Card sx={{ maxWidth: 250, height: 250, display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, position: 'relative', overflow: 'hidden' }}>
                   {imagePreview ? (
                     <>
                       <CardMedia component="img" image={imagePreview} alt="Previsualización" sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                      <IconButton onClick={handleRemoveImage} sx={{ position: 'absolute', top: 4, right: 4, color: 'white', backgroundColor: 'rgba(0,0,0,0.6)' }} size="small">
+                      <IconButton onClick={handleRemoveImage} sx={{ position: 'absolute', top: 4, right: 4, color: 'white', backgroundColor: 'rgba(0,0,0,0.6)', '&:hover': {backgroundColor: 'rgba(0,0,0,0.8)'} }} size="small">
                         <CloseIcon fontSize="small" />
                       </IconButton>
                     </>
@@ -229,15 +257,27 @@ function ProductsPage() {
                 </Card>
                 <Button variant="outlined" component="label" fullWidth startIcon={<ImageIcon />}>
                   {imagePreview ? 'Cambiar Imagen' : 'Subir Imagen'}
-                  <input type="file" hidden accept="image/*" {...register('image')} ref={fileInputRef} />
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    {...register('image')} // Registering the file input
+                    ref={fileInputRef}
+                  />
                 </Button>
               </Grid>
               <Grid item xs={12} md={8}>
+                {/* Ensure all fields expected by ProductCreate/ProductUpdate schema are registered */}
                 <TextField {...register('name', { required: 'El nombre es obligatorio' })} label="Nombre del Producto" fullWidth margin="dense" error={!!errors.name} helperText={errors.name?.message} />
-                <TextField {...register('description', { required: 'La descripción es obligatoria' })} label="Descripción" multiline rows={4} fullWidth margin="dense" error={!!errors.description} helperText={errors.description?.message} />
+                <TextField {...register('brand')} label="Marca" fullWidth margin="dense" /> 
+                <TextField {...register('description', { required: 'La descripción es obligatoria' })} label="Descripción" multiline rows={3} fullWidth margin="dense" error={!!errors.description} helperText={errors.description?.message} />
                 <TextField {...register('price', { required: 'El precio es obligatorio', valueAsNumber: true, min: { value: 0.01, message: 'El precio debe ser mayor a 0.' } })} label="Precio ($)" type="number" fullWidth margin="dense" error={!!errors.price} helperText={errors.price?.message} inputProps={{ step: "0.01" }} />
                 <TextField {...register('stock', { required: 'El stock es obligatorio', valueAsNumber: true, min: { value: 0, message: 'El stock no puede ser negativo.' } })} label="Stock" type="number" fullWidth margin="dense" error={!!errors.stock} helperText={errors.stock?.message} />
                 <TextField {...register('category', { required: 'La categoría es obligatoria' })} label="Categoría" fullWidth margin="dense" error={!!errors.category} helperText={errors.category?.message} />
+                <TextField {...register('sku')} label="SKU" fullWidth margin="dense" /> 
+                <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar"/> 
+                {/* Hidden field for image_url if needed, usually handled in onSubmit */}
+                {/* <input type="hidden" {...register('image_url')} /> */}
               </Grid>
             </Grid>
           </DialogContent>
