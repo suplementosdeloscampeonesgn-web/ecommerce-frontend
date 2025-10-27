@@ -3,22 +3,20 @@ import apiClient from '../../api/apiClient'; // Tu instancia de Axios configurad
 import {
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
-  Card, CardMedia, IconButton, FormControlLabel, Checkbox // Añadido FormControlLabel y Checkbox si los usas
+  Card, CardMedia, IconButton, FormControlLabel, Checkbox
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
 import { uploadImage } from '../../utils/uploadImageToFirebase'; // Verifica esta ruta
 
-// --- DEBUG --- Log de Renderizado del Componente
 console.log('--- Renderizando ProductsPage ---');
 
 function ProductsPage() {
-  // --- DEBUG --- Log de Inicialización de useForm
   console.log('--- Inicializando useForm ---');
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isDirty, isValid } } = useForm({
-    mode: 'onChange', // Validar al cambiar para feedback inmediato
-    defaultValues: { // Establecer valores por defecto claros
+    mode: 'onChange',
+    defaultValues: {
         name: '',
         brand: '',
         description: '',
@@ -34,11 +32,9 @@ function ProductsPage() {
     }
   });
 
-  // --- DEBUG --- Log de 'watch' para el campo de imagen
   const imageFile = watch('image');
   console.log('--- Observando campo \'image\', valor actual:', imageFile);
 
-  // Estados del componente
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,15 +44,12 @@ function ProductsPage() {
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Cargar productos (con useCallback para estabilidad de referencia)
   const loadProducts = useCallback(async () => {
-    // --- DEBUG --- Inicio de Carga de Productos
     console.log('--- loadProducts: Obteniendo productos ---');
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/admin/products'); // Usa la ruta de admin
+      const response = await apiClient.get('/api/admin/products');
       if (response.data && Array.isArray(response.data)) {
-        // --- DEBUG --- Carga de Productos Exitosa
         console.log(`--- loadProducts: Éxito, ${response.data.length} productos recibidos ---`);
         setProducts(response.data);
       } else {
@@ -65,262 +58,206 @@ function ProductsPage() {
         setSnackbar({ open: true, message: 'Error: Respuesta del servidor no válida.', severity: 'error' });
       }
     } catch (error) {
-      // --- DEBUG --- Error en Carga de Productos
       console.error("--- loadProducts: Error obteniendo productos ---", error.response?.data?.detail || error.message);
       setProducts([]);
       setSnackbar({ open: true, message: `Error al cargar productos: ${error.message}`, severity: 'error' });
     } finally {
-      // --- DEBUG --- Fin de Carga de Productos
       console.log('--- loadProducts: Carga finalizada ---');
       setLoading(false);
     }
-  }, []); // Sin dependencias
+  }, []);
 
-  // Efecto para cargar productos al montar el componente
   useEffect(() => {
-    // --- DEBUG --- Efecto de Carga Inicial
     console.log('--- useEffect[]: Llamada inicial a loadProducts ---');
     loadProducts();
-  }, [loadProducts]); // Dependencia: loadProducts
+  }, [loadProducts]);
 
-  // --- useEffect con MÁXIMA DEPURACIÓN para previsualización de imagen ---
   useEffect(() => {
-    // --- DEBUG --- Inicio del Efecto de Previsualización
     console.log("--- useEffect[imageFile]: INICIO ---");
     console.log("   > Valor actual imageFile:", imageFile);
     console.log("   > Producto en edición:", editingProduct);
     console.log("   > Estado actual imagePreview:", imagePreview);
 
-    // Verifica si imageFile es un FileList válido con al menos un archivo
     if (imageFile && imageFile instanceof FileList && imageFile.length > 0) {
       const file = imageFile[0];
-      // --- DEBUG --- Archivo Detectado
       console.log("   > Archivo detectado:", file);
       console.log(`   > Detalles: nombre=${file.name}, tamaño=${file.size}, tipo=${file.type}`);
 
-      // Validación básica de tipo de archivo
       if (!file.type.startsWith('image/')) {
         console.warn("   > El archivo seleccionado no es de tipo imagen:", file.type);
         setSnackbar({ open: true, message: 'Por favor, selecciona un archivo de imagen (png, jpg, webp, gif).', severity: 'warning' });
-        setValue('image', null); // Limpia el estado de RHF
-        if(fileInputRef.current) fileInputRef.current.value = ''; // Limpia el input del DOM
-        setImagePreview(editingProduct?.image_url || null); // Revierte a la imagen original o null
-        return; // Detiene la ejecución
+        setValue('image', null);
+        if(fileInputRef.current) fileInputRef.current.value = '';
+        setImagePreview(editingProduct?.image_url || null);
+        return;
       }
 
-      let currentPreviewUrl = null; // Guarda la URL localmente para limpieza segura
+      let currentPreviewUrl = null;
       try {
         currentPreviewUrl = URL.createObjectURL(file);
-        // --- DEBUG --- Creando URL Blob
         console.log("   > Creando URL Blob:", currentPreviewUrl);
-        setImagePreview(currentPreviewUrl); // Actualiza el estado para mostrarla
+        setImagePreview(currentPreviewUrl);
 
-        // Función de limpieza para esta URL específica
         return () => {
-          // --- DEBUG --- Disparador de Limpieza
           console.log(`--- useEffect[imageFile]: LIMPIEZA para ${currentPreviewUrl} ---`);
           URL.revokeObjectURL(currentPreviewUrl);
           console.log(`   > URL Blob revocada: ${currentPreviewUrl}`);
         };
       } catch (error) {
-        // --- DEBUG --- Error Creando URL Blob
         console.error("   > Error creando URL Blob:", error);
-        setImagePreview(null); // Resetea la previsualización en caso de error
+        setImagePreview(null);
       }
     } else {
-      // --- DEBUG --- Sin Archivo o FileList Vacío
       console.log("   > No se detectó archivo válido en imageFile.");
-      // Lógica para resetear/restaurar previsualización
       if (!editingProduct?.image_url) {
            console.log("   > Estableciendo previsualización a null (no hay imagen existente).");
            setImagePreview(null);
       } else {
-           // Si se edita y se quitó un archivo seleccionado, o estado inicial sin archivo, muestra la original
            console.log("   > Restaurando previsualización a imagen original del producto:", editingProduct.image_url);
-           // Solo restaura si la preview actual no es ya la original (evita bucle)
            if (imagePreview !== editingProduct.image_url) {
                setImagePreview(editingProduct.image_url);
            }
       }
     }
-     // --- DEBUG --- Fin del Efecto de Previsualización
      console.log("--- useEffect[imageFile]: FIN ---");
-  }, [imageFile, editingProduct, setValue]); // Dependencias: imageFile, editingProduct, setValue
+  }, [imageFile, editingProduct, setValue]);
 
-  // Abrir modal (con useCallback)
   const handleOpenModal = useCallback((product = null) => {
-    // --- DEBUG --- Abrir Modal
     console.log('--- handleOpenModal: Abriendo modal ---', product ? `Editando ID: ${product.id}` : 'Nuevo producto');
-    reset(); // Resetea estado del formulario ANTES de poner valores
-    // Establece previsualización inicial (URL existente o null) DESPUÉS de reset
+    reset();
     setImagePreview(product?.image_url || null);
     setEditingProduct(product);
 
     if (product) {
       console.log('   > Estableciendo valores del formulario desde producto:', product);
-      // Itera sobre el producto y usa setValue
       Object.entries(product).forEach(([key, value]) => {
-         // Asegúrate de que el campo exista en tu useForm defaultValues o register
-         // No intentes establecer 'image' (el FileList)
          if (key !== 'image') {
             try {
-                setValue(key, value, { shouldValidate: true, shouldDirty: false }); // No marcar como sucio al inicio
+                setValue(key, value, { shouldValidate: true, shouldDirty: false });
             } catch (e) {
                 console.warn(`Error setting value for key "${key}":`, e);
             }
          }
       });
-      // Asegura que el campo 'image' esté vacío al editar
       setValue('image', null);
     } else {
-        // Resetea a valores por defecto definidos en useForm para nuevo producto
         reset();
-        setValue('id', null); // Asegura que id sea null
-        setValue('image', null); // Asegura que imagen sea null
-        setImagePreview(null); // Asegura que preview sea null
+        setValue('id', null);
+        setValue('image', null);
+        setImagePreview(null);
     }
     setIsModalOpen(true);
-  }, [reset, setValue]); // Dependencias: reset, setValue
+  }, [reset, setValue]);
 
-  // Cerrar modal (con useCallback)
   const handleCloseModal = useCallback(() => {
-    // --- DEBUG --- Cerrar Modal
     console.log('--- handleCloseModal: Cerrando modal ---');
     setIsModalOpen(false);
     setEditingProduct(null);
-    reset(); // Resetea el formulario al cerrar
-    setImagePreview(null); // Limpia previsualización
+    reset();
+    setImagePreview(null);
     if (fileInputRef.current) {
       console.log('   > Limpiando valor del input de archivo.');
-      fileInputRef.current.value = ''; // Limpia el input del DOM
+      fileInputRef.current.value = '';
     }
-  }, [reset]); // Dependencia: reset
+  }, [reset]);
 
-  // Enviar formulario (Guardar/Actualizar)
   const onSubmit = async (data) => {
-    // --- DEBUG --- Inicio de Submit
     console.log('--- onSubmit: INICIO ---');
     console.log('   > Datos recibidos del formulario:', data);
     setIsSubmitting(true);
-    let finalImageUrl = editingProduct?.image_url || ""; // URL existente o vacía
+    let finalImageUrl = editingProduct?.image_url || "";
 
     try {
-      // Verifica si se seleccionó un nuevo archivo
       const newImageFile = data.image && data.image.length > 0 ? data.image[0] : null;
 
       if (newImageFile) {
-        // --- DEBUG --- Subiendo Imagen
         console.log("   > Nuevo archivo detectado. Subiendo a Firebase:", newImageFile);
-        const uploadedUrl = await uploadImage(newImageFile, "productos"); // Llama a tu función
-        // --- DEBUG --- Resultado de Subida
+        const uploadedUrl = await uploadImage(newImageFile, "productos");
         console.log("   > URL de Firebase:", uploadedUrl);
         if (!uploadedUrl) {
           throw new Error("La subida a Firebase falló, no se recibió URL.");
         }
-        finalImageUrl = uploadedUrl; // Actualiza con la nueva URL
+        finalImageUrl = uploadedUrl;
       } else {
-        // --- DEBUG --- Sin Nueva Imagen
         console.log("   > No se seleccionó archivo nuevo. Usando URL previa/existente:", finalImageUrl);
-        // Verifica si el usuario quitó explícitamente la imagen
-        // (handleRemoveImage puede poner image_url = null en el estado del form 'data')
         if (data.image_url === null || data.image_url === '') {
              console.log("   > Imagen explícitamente eliminada por el usuario.");
-             finalImageUrl = data.image_url; // Usa el valor vacío/nulo
+             finalImageUrl = data.image_url;
         }
       }
 
-      // Prepara el payload para la API Backend
       const body = {
-        ...data, // Incluye todos los campos del formulario
-        image_url: finalImageUrl, // Envía la URL correcta
-        image: undefined // IMPORTANTE: No enviar el objeto FileList
+        ...data,
+        image_url: finalImageUrl,
+        image: undefined
       };
-      // Elimina campos que no quieras enviar si es necesario (ej. si 'id' no debe ir en POST)
       if (!editingProduct) {
           delete body.id;
       }
 
-      // --- DEBUG --- Payload enviado a la API
       console.log('   > Payload para la API:', body);
 
       let response;
       if (editingProduct) {
-        // --- DEBUG --- Llamando API PUT
         console.log(`   > Llamando PUT /api/admin/products/${editingProduct.id}`);
         response = await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
       } else {
-        // --- DEBUG --- Llamando API POST
         console.log(`   > Llamando POST /api/admin/products`);
         response = await apiClient.post('/api/admin/products', body);
       }
 
-      // --- DEBUG --- Respuesta de la API
       console.log('   > Respuesta API:', response.data);
 
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
-      await loadProducts(); // Recarga la lista
+      await loadProducts();
       handleCloseModal();
     } catch (error) {
-      // --- DEBUG --- Error en Submit
       console.error("--- onSubmit: ERROR ---", error.response?.data || error.message);
       const errorMessage = error.response?.data?.detail || error.message || 'Error desconocido al guardar.';
       setSnackbar({ open: true, message: `Error: ${errorMessage}`, severity: 'error' });
     } finally {
-      // --- DEBUG --- Fin de Submit
       console.log('--- onSubmit: FIN ---');
       setIsSubmitting(false);
     }
   };
 
-  // Eliminar producto (con useCallback)
   const handleDelete = useCallback(async (id) => {
-    // --- DEBUG --- Inicio de Borrado
     console.log(`--- handleDelete: Intentando borrar producto ID: ${id} ---`);
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-      // Considera usar estado específico como `isDeleting`
-      setLoading(true); // O un estado específico: setIsDeleting(id)
+      setLoading(true);
       try {
-        // --- DEBUG --- Llamando API DELETE
         console.log(`   > Llamando DELETE /api/admin/products/${id}`);
         await apiClient.delete(`/api/admin/products/${id}`);
-        // --- DEBUG --- Borrado Exitoso
         console.log(`   > Producto ID: ${id} eliminado.`);
         setSnackbar({ open: true, message: 'Producto eliminado.', severity: 'warning' });
-        await loadProducts(); // Recarga la lista
+        await loadProducts();
       } catch (error) {
-        // --- DEBUG --- Error en Borrado
         console.error(`--- handleDelete: Error borrando ID: ${id} ---`, error.response?.data?.detail || error.message);
         setSnackbar({ open: true, message: `Error al eliminar: ${error.message}`, severity: 'error' });
       } finally {
-        // --- DEBUG --- Fin de Borrado
         console.log(`--- handleDelete: Finalizado para ID: ${id} ---`);
-        setLoading(false); // O setIsDeleting(null)
+        setLoading(false);
       }
     } else {
-      // --- DEBUG --- Borrado Cancelado
       console.log(`--- handleDelete: Borrado cancelado para ID: ${id} ---`);
     }
-  }, [loadProducts]); // Dependencia: loadProducts
+  }, [loadProducts]);
 
-  // Quitar imagen seleccionada/previsualizada (con useCallback)
   const handleRemoveImage = useCallback(() => {
-    // --- DEBUG --- Quitar Imagen
     console.log('--- handleRemoveImage: Quitando imagen seleccionada/previsualizada ---');
     setImagePreview(null);
-    setValue('image', null, { shouldDirty: true }); // Limpia estado RHF, marca como sucio
+    setValue('image', null, { shouldDirty: true });
     if (fileInputRef.current) {
       console.log('   > Limpiando valor del input de archivo.');
-      fileInputRef.current.value = ''; // Limpia input del DOM
+      fileInputRef.current.value = '';
     }
-    // Si se edita, establece image_url a null en el form para señalar eliminación al guardar
     if (editingProduct) {
         console.log('   > Estableciendo image_url a null en el estado del form.');
-        setValue('image_url', null, { shouldDirty: true }); // Señala eliminación
+        setValue('image_url', null, { shouldDirty: true });
     }
-  }, [setValue, editingProduct]); // Dependencias: setValue, editingProduct
+  }, [setValue, editingProduct]);
 
-  // Definición de columnas (fuera del render, memoizar con useMemo si es necesario)
-  const columns = React.useMemo(() => [ // Envuelto en useMemo
+  const columns = React.useMemo(() => [
     { field: 'id', headerName: 'ID', width: 70 },
     {
       field: 'image_url',
@@ -337,19 +274,18 @@ function ProductsPage() {
       ),
       sortable: false, filterable: false,
     },
-    { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 150 }, // Usa flex para adaptabilidad
+    { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 150 },
     { field: 'brand', headerName: 'Marca', width: 130 },
     {
       field: 'price',
       headerName: 'Precio ($)',
       type: 'number',
       width: 110,
-      // ✅ CORRECCIÓN toFixed: Verifica si es número antes de formatear
       valueFormatter: (value) => {
         if (typeof value === 'number') {
           return `$${value.toFixed(2)}`;
         }
-        return '$ --'; // Valor por defecto si no es número
+        return '$ --';
       }
     },
     { field: 'stock', headerName: 'Stock', type: 'number', width: 90 },
@@ -360,7 +296,6 @@ function ProductsPage() {
       width: 130,
       sortable: false,
       filterable: false,
-      // Usar useCallback dentro de useMemo para renderCell
       renderCell: (params) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <IconButton aria-label="Editar" color="primary" size="small" onClick={() => handleOpenModal(params.row)}><Edit fontSize="small" /></IconButton>
@@ -368,10 +303,8 @@ function ProductsPage() {
         </Box>
       ),
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [handleDelete, handleOpenModal]); // Dependencias para useMemo
+  ], [handleDelete, handleOpenModal]);
 
-  // --- DEBUG --- Log Estado de Carga
   console.log(`--- Renderizando ProductsPage, estado loading: ${loading} ---`);
 
   if (loading) {
@@ -384,14 +317,14 @@ function ProductsPage() {
   }
 
   return (
-    <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}> {/* Padding responsivo */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}> {/* Flex wrap */}
+    <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>Gestión de Productos</Typography>
         <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenModal()}>
           Añadir Producto
         </Button>
       </Box>
-      <Box sx={{ height: '70vh', width: '100%', backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}> {/* Mejor estilo tabla */}
+      <Box sx={{ height: '70vh', width: '100%', backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}>
         <DataGrid
           rows={products}
           columns={columns}
@@ -401,20 +334,15 @@ function ProductsPage() {
           disableRowSelectionOnClick
           getRowId={(row) => row.id}
           onError={(error) => console.error('--- Error DataGrid ---', error)}
-          // Estilos para mejorar visualización
           sx={{ border: 0, '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' } }}
         />
       </Box>
-
-      {/* --- MODAL --- */}
       <Dialog open={isModalOpen} onClose={handleCloseModal} fullWidth maxWidth="md" aria-labelledby="product-dialog-title">
         <DialogTitle id="product-dialog-title">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
-        {/* --- DEBUG --- Log de estado del form dentro del modal */}
         {isModalOpen && console.log('--- Modal Abierto, Errores RHF:', errors, `Sucio: ${isDirty}, Válido: ${isValid}`)}
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogContent dividers>
             <Grid container spacing={3}>
-              {/* Columna Imagen */}
               <Grid item xs={12} md={4}>
                 <Typography variant="subtitle1" gutterBottom component="h3">Imagen</Typography>
                 <Card sx={{ width: '100%', aspectRatio: '1 / 1', display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, position: 'relative', overflow: 'hidden', backgroundColor: '#f0f0f0' }}>
@@ -429,24 +357,23 @@ function ProductsPage() {
                     <ImageIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                   )}
                 </Card>
-                <Button variant="outlined" component="label" fullWidth startIcon={<ImageIcon />}>
-                  {imagePreview ? 'Cambiar Imagen' : 'Subir Imagen'}
-                  <input
-                    id="image-upload-input"
-                    type="file"
-                    hidden
-                    accept="image/png, image/jpeg, image/webp, image/gif" // Tipos específicos
-                    // --- DEBUG --- onChange directo en input oculto
-                    onChange={(e) => console.log('>>> Input onChange DIRECTO:', e.target.files)}
-                    {...register('image')} // Registro RHF
-                    ref={fileInputRef}
-                    aria-label="Subir imagen de producto"
-                  />
-                </Button>
-                 {/* Mensaje de error para imagen */}
-                 {errors.image && <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>{errors.image.message || 'Error en archivo de imagen'}</Typography>}
+                {/* --- CAMBIO CRÍTICO: Input visible, nunca oculto, registra correctamente con RHF --- */}
+                <input
+                  id="image-upload-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  {...register('image')}
+                  ref={fileInputRef}
+                  style={{ display: "block", marginBottom: "12px" }}
+                  onChange={e => console.log("onChange REAL imagen:", e.target.files)}
+                  aria-label="Subir imagen de producto"
+                />
+                {errors.image &&
+                  <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>
+                    {errors.image.message || 'Error en archivo de imagen'}
+                  </Typography>
+                }
               </Grid>
-              {/* Columna Campos */}
               <Grid item xs={12} md={8}>
                 <TextField
                   {...register('name', { required: 'El nombre es obligatorio' })}
@@ -462,7 +389,7 @@ function ProductsPage() {
                   required
                  />
                 <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}> {/* Grid responsivo */}
+                    <Grid item xs={12} sm={6}>
                         <TextField
                         {...register('price', {
                             required: 'El precio es obligatorio', valueAsNumber: true,
@@ -474,7 +401,7 @@ function ProductsPage() {
                         required
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6}> {/* Grid responsivo */}
+                    <Grid item xs={12} sm={6}>
                         <TextField
                         {...register('stock', {
                             required: 'El stock es obligatorio', valueAsNumber: true,
@@ -496,11 +423,6 @@ function ProductsPage() {
                 />
                 <TextField {...register('sku')} label="SKU" fullWidth margin="dense" helperText="Código único (opcional)"/>
                 <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar (recomendado)"/>
-                {/* Checkbox opcionales */}
-                {/*
-                <FormControlLabel control={<Checkbox {...register('is_active')} defaultChecked={editingProduct ? editingProduct.is_active : true} />} label="Activo" sx={{mt: 1}}/>
-                <FormControlLabel control={<Checkbox {...register('is_featured')} defaultChecked={editingProduct?.is_featured || false} />} label="Destacado" sx={{mt: 1}}/>
-                */}
               </Grid>
             </Grid>
           </DialogContent>
@@ -509,16 +431,14 @@ function ProductsPage() {
             <Button
               type="submit"
               variant="contained"
-              disabled={isSubmitting || !isDirty || !isValid} // Deshabilita si no hay cambios o no es válido
+              disabled={isSubmitting || !isDirty || !isValid}
             >
               {isSubmitting ? <CircularProgress size={24} color="inherit" /> : (editingProduct ? 'Actualizar Producto' : 'Crear Producto')}
             </Button>
           </DialogActions>
         </form>
       </Dialog>
-
-      {/* Snackbar para notificaciones */}
-       <Snackbar
+      <Snackbar
          open={snackbar.open}
          autoHideDuration={6000}
          onClose={() => setSnackbar({ ...snackbar, open: false })}
