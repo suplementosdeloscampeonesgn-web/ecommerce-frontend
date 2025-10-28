@@ -33,8 +33,6 @@ function ProductsPage() {
   });
 
   const imageFile = watch('image');
-  console.log('--- Observando campo \'image\', valor actual:', imageFile);
-
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,110 +43,64 @@ function ProductsPage() {
   const fileInputRef = useRef(null);
 
   const loadProducts = useCallback(async () => {
-    console.log('--- loadProducts: Obteniendo productos ---');
     setLoading(true);
     try {
       const response = await apiClient.get('/api/admin/products');
       if (response.data && Array.isArray(response.data)) {
-        console.log(`--- loadProducts: Éxito, ${response.data.length} productos recibidos ---`);
         setProducts(response.data);
       } else {
-        console.error("--- loadProducts: La respuesta de la API no es un array válido:", response.data);
         setProducts([]);
         setSnackbar({ open: true, message: 'Error: Respuesta del servidor no válida.', severity: 'error' });
       }
     } catch (error) {
-      console.error("--- loadProducts: Error obteniendo productos ---", error.response?.data?.detail || error.message);
       setProducts([]);
       setSnackbar({ open: true, message: `Error al cargar productos: ${error.message}`, severity: 'error' });
     } finally {
-      console.log('--- loadProducts: Carga finalizada ---');
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    console.log('--- useEffect[]: Llamada inicial a loadProducts ---');
     loadProducts();
   }, [loadProducts]);
 
   useEffect(() => {
-    console.log("--- useEffect[imageFile]: INICIO ---");
-    console.log("   > Valor actual imageFile:", imageFile);
-    console.log("   > Producto en edición:", editingProduct);
-    console.log("   > Estado actual imagePreview:", imagePreview);
-
-    // RHF entrega array o FileList. Verifica ambos casos.
-    let file;
+    let file = null;
     if (imageFile) {
-      // Si es FileList (navegadores modernos)
-      if (imageFile instanceof FileList && imageFile.length > 0) {
-        file = imageFile[0];
-      }
-      // Si RHF entrega array (algunos setups/devtools)
-      if (Array.isArray(imageFile) && imageFile.length > 0 && imageFile[0] instanceof File) {
-        file = imageFile[0];
-      }
+      if (imageFile instanceof FileList && imageFile.length > 0) file = imageFile[0];
+      if (Array.isArray(imageFile) && imageFile.length > 0 && imageFile[0] instanceof File) file = imageFile[0];
     }
-
     if (file) {
-      console.log("   > Archivo detectado:", file);
-      console.log(`   > Detalles: nombre=${file.name}, tamaño=${file.size}, tipo=${file.type}`);
-
-      if (!file.type.startsWith('image/')) {
-        console.warn("   > El archivo seleccionado no es de tipo imagen:", file.type);
-        setSnackbar({ open: true, message: 'Por favor, selecciona un archivo de imagen (png, jpg, webp, gif).', severity: 'warning' });
-        setValue('image', null);
-        setImagePreview(editingProduct?.image_url || null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
-      }
-
-      let currentPreviewUrl = null;
-      try {
-        currentPreviewUrl = URL.createObjectURL(file);
-        console.log("   > Creando URL Blob:", currentPreviewUrl);
-        setImagePreview(currentPreviewUrl);
-
-        return () => {
-          console.log(`--- useEffect[imageFile]: LIMPIEZA para ${currentPreviewUrl} ---`);
-          URL.revokeObjectURL(currentPreviewUrl);
-          console.log(`   > URL Blob revocada: ${currentPreviewUrl}`);
-        };
-      } catch (error) {
-        console.error("   > Error creando URL Blob:", error);
+      if (file.type.startsWith('image/')) {
+        try {
+          const url = URL.createObjectURL(file);
+          setImagePreview(url);
+          return () => URL.revokeObjectURL(url);
+        } catch (err) {
+          setSnackbar({ open: true, message: 'Error creando la vista previa: ' + err.message, severity: 'error' });
+          setImagePreview(null);
+        }
+      } else {
+        setSnackbar({ open: true, message: 'Selecciona archivo de imagen válido.', severity: 'warning' });
         setImagePreview(null);
       }
     } else {
-      console.log("   > No se detectó archivo válido en imageFile.");
-      if (!editingProduct?.image_url) {
-           console.log("   > Estableciendo previsualización a null (no hay imagen existente).");
-           setImagePreview(null);
+      if (editingProduct?.image_url) {
+        setImagePreview(editingProduct.image_url);
       } else {
-           console.log("   > Restaurando previsualización a imagen original del producto:", editingProduct.image_url);
-           if (imagePreview !== editingProduct.image_url) {
-               setImagePreview(editingProduct.image_url);
-           }
+        setImagePreview(null);
       }
     }
-     console.log("--- useEffect[imageFile]: FIN ---");
-  }, [imageFile, editingProduct, setValue]);
+  }, [imageFile, editingProduct]);
 
   const handleOpenModal = useCallback((product = null) => {
-    console.log('--- handleOpenModal: Abriendo modal ---', product ? `Editando ID: ${product.id}` : 'Nuevo producto');
     reset();
     setImagePreview(product?.image_url || null);
     setEditingProduct(product);
-
     if (product) {
-      console.log('   > Estableciendo valores del formulario desde producto:', product);
       Object.entries(product).forEach(([key, value]) => {
          if (key !== 'image') {
-            try {
-                setValue(key, value, { shouldValidate: true, shouldDirty: false });
-            } catch (e) {
-                console.warn(`Error setting value for key "${key}":`, e);
-            }
+            try { setValue(key, value, { shouldValidate: true, shouldDirty: false }); } catch (e) {}
          }
       });
       setValue('image', null);
@@ -162,116 +114,74 @@ function ProductsPage() {
   }, [reset, setValue]);
 
   const handleCloseModal = useCallback(() => {
-    console.log('--- handleCloseModal: Cerrando modal ---');
     setIsModalOpen(false);
     setEditingProduct(null);
     reset();
     setImagePreview(null);
-    if (fileInputRef.current) {
-      console.log('   > Limpiando valor del input de archivo.');
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [reset]);
 
   const onSubmit = async (data) => {
-    console.log('--- onSubmit: INICIO ---');
-    console.log('   > Datos recibidos del formulario:', data);
     setIsSubmitting(true);
     let finalImageUrl = editingProduct?.image_url || "";
-
     try {
-      const newImageFile = (
+      let newImageFile = (
         data.image && data.image.length > 0
         && (data.image[0] instanceof File)
           ? data.image[0]
           : null
       );
-
       if (newImageFile) {
-        console.log("   > Nuevo archivo detectado. Subiendo a Firebase:", newImageFile);
-        const uploadedUrl = await uploadImage(newImageFile, "productos");
-        console.log("   > URL de Firebase:", uploadedUrl);
-        if (!uploadedUrl) {
-          throw new Error("La subida a Firebase falló, no se recibió URL.");
-        }
+        const uploadedUrl = await uploadImage(newImageFile); // Usa tu función conectada a /api/admin/upload-images
+        if (!uploadedUrl) throw new Error("La subida de la imagen falló.");
         finalImageUrl = uploadedUrl;
       } else {
-        console.log("   > No se seleccionó archivo nuevo. Usando URL previa/existente:", finalImageUrl);
         if (data.image_url === null || data.image_url === '') {
-             console.log("   > Imagen explícitamente eliminada por el usuario.");
-             finalImageUrl = data.image_url;
+          finalImageUrl = data.image_url;
         }
       }
-
       const body = {
         ...data,
         image_url: finalImageUrl,
         image: undefined
       };
-      if (!editingProduct) {
-          delete body.id;
-      }
-
-      console.log('   > Payload para la API:', body);
-
+      if (!editingProduct) delete body.id;
       let response;
       if (editingProduct) {
-        console.log(`   > Llamando PUT /api/admin/products/${editingProduct.id}`);
         response = await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
       } else {
-        console.log(`   > Llamando POST /api/admin/products`);
         response = await apiClient.post('/api/admin/products', body);
       }
-
-      console.log('   > Respuesta API:', response.data);
-
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
       await loadProducts();
       handleCloseModal();
     } catch (error) {
-      console.error("--- onSubmit: ERROR ---", error.response?.data || error.message);
-      const errorMessage = error.response?.data?.detail || error.message || 'Error desconocido al guardar.';
-      setSnackbar({ open: true, message: `Error: ${errorMessage}`, severity: 'error' });
+      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
     } finally {
-      console.log('--- onSubmit: FIN ---');
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = useCallback(async (id) => {
-    console.log(`--- handleDelete: Intentando borrar producto ID: ${id} ---`);
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       setLoading(true);
       try {
-        console.log(`   > Llamando DELETE /api/admin/products/${id}`);
         await apiClient.delete(`/api/admin/products/${id}`);
-        console.log(`   > Producto ID: ${id} eliminado.`);
         setSnackbar({ open: true, message: 'Producto eliminado.', severity: 'warning' });
         await loadProducts();
       } catch (error) {
-        console.error(`--- handleDelete: Error borrando ID: ${id} ---`, error.response?.data?.detail || error.message);
         setSnackbar({ open: true, message: `Error al eliminar: ${error.message}`, severity: 'error' });
       } finally {
-        console.log(`--- handleDelete: Finalizado para ID: ${id} ---`);
         setLoading(false);
       }
-    } else {
-      console.log(`--- handleDelete: Borrado cancelado para ID: ${id} ---`);
     }
   }, [loadProducts]);
 
   const handleRemoveImage = useCallback(() => {
-    console.log('--- handleRemoveImage: Quitando imagen seleccionada/previsualizada ---');
     setImagePreview(null);
     setValue('image', null, { shouldDirty: true });
-    if (fileInputRef.current) {
-      console.log('   > Limpiando valor del input de archivo.');
-      fileInputRef.current.value = '';
-    }
-    if (editingProduct) {
-        console.log('   > Estableciendo image_url a null en el estado del form.');
-        setValue('image_url', null, { shouldDirty: true });
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (editingProduct) setValue('image_url', null, { shouldDirty: true });
   }, [setValue, editingProduct]);
 
   const columns = React.useMemo(() => [
@@ -286,7 +196,7 @@ function ProductsPage() {
           sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
           image={params.value || 'https://via.placeholder.com/60?text=No+Img'}
           alt="Imagen Producto"
-          onError={(e) => { e.target.onerror = null; e.target.src='https://via.placeholder.com/60?text=Error'; console.warn(`Fallo al cargar imagen: ${params.value}`) }}
+          onError={e => { e.target.onerror = null; e.target.src='https://via.placeholder.com/60?text=Error'; }}
         />
       ),
       sortable: false, filterable: false,
@@ -299,9 +209,7 @@ function ProductsPage() {
       type: 'number',
       width: 110,
       valueFormatter: (value) => {
-        if (typeof value === 'number') {
-          return `$${value.toFixed(2)}`;
-        }
+        if (typeof value === 'number') return `$${value.toFixed(2)}`;
         return '$ --';
       }
     },
@@ -321,8 +229,6 @@ function ProductsPage() {
       ),
     },
   ], [handleDelete, handleOpenModal]);
-
-  console.log(`--- Renderizando ProductsPage, estado loading: ${loading} ---`);
 
   if (loading) {
     return (
@@ -350,13 +256,11 @@ function ProductsPage() {
           checkboxSelection
           disableRowSelectionOnClick
           getRowId={(row) => row.id}
-          onError={(error) => console.error('--- Error DataGrid ---', error)}
           sx={{ border: 0, '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' } }}
         />
       </Box>
       <Dialog open={isModalOpen} onClose={handleCloseModal} fullWidth maxWidth="md" aria-labelledby="product-dialog-title">
         <DialogTitle id="product-dialog-title">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
-        {isModalOpen && console.log('--- Modal Abierto, Errores RHF:', errors, `Sucio: ${isDirty}, Válido: ${isValid}`)}
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <DialogContent dividers>
             <Grid container spacing={3}>
@@ -374,7 +278,6 @@ function ProductsPage() {
                     <ImageIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                   )}
                 </Card>
-                {/* Input funcional para RHF y preview */}
                 <input
                   id="image-upload-input"
                   type="file"
@@ -391,54 +294,23 @@ function ProductsPage() {
                 }
               </Grid>
               <Grid item xs={12} md={8}>
-                <TextField
-                  {...register('name', { required: 'El nombre es obligatorio' })}
-                  label="Nombre del Producto *" fullWidth margin="dense"
-                  error={!!errors.name} helperText={errors.name?.message}
-                  required autoFocus={!editingProduct}
-                />
+                <TextField  {...register('name', { required: 'El nombre es obligatorio' })} label="Nombre del Producto *" fullWidth margin="dense"
+                  error={!!errors.name} helperText={errors.name?.message} required autoFocus={!editingProduct} />
                 <TextField {...register('brand')} label="Marca" fullWidth margin="dense" />
-                <TextField
-                  {...register('description', { required: 'La descripción es obligatoria' })}
-                  label="Descripción *" multiline rows={3} fullWidth margin="dense"
-                  error={!!errors.description} helperText={errors.description?.message}
-                  required
-                 />
+                <TextField {...register('description', { required: 'La descripción es obligatoria' })} label="Descripción *" multiline rows={3} fullWidth margin="dense" error={!!errors.description} helperText={errors.description?.message} required />
                 <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                        {...register('price', {
-                            required: 'El precio es obligatorio', valueAsNumber: true,
-                            min: { value: 0.01, message: 'Precio debe ser mayor a 0.' }
-                        })}
-                        label="Precio ($) *" type="number" fullWidth margin="dense"
-                        error={!!errors.price} helperText={errors.price?.message}
-                        InputProps={{ inputProps: { step: "0.01", min: "0.01" } }}
-                        required
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                        {...register('stock', {
-                            required: 'El stock es obligatorio', valueAsNumber: true,
-                            min: { value: 0, message: 'Stock no puede ser negativo.' },
-                            validate: value => Number.isInteger(value) || 'Stock debe ser entero.'
-                        })}
-                        label="Stock *" type="number" fullWidth margin="dense"
-                        error={!!errors.stock} helperText={errors.stock?.message}
-                        InputProps={{ inputProps: { step: "1", min: "0" } }}
-                        required
-                        />
-                    </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField {...register('price', { required: 'El precio es obligatorio', valueAsNumber: true, min: { value: 0.01, message: 'Precio debe ser mayor a 0.' } })}
+                      label="Precio ($) *" type="number" fullWidth margin="dense" error={!!errors.price} helperText={errors.price?.message} InputProps={{ inputProps: { step: "0.01", min: "0.01" } }} required />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField {...register('stock', { required: 'El stock es obligatorio', valueAsNumber: true, min: { value: 0, message: 'Stock no puede ser negativo.' }, validate: value => Number.isInteger(value) || 'Stock debe ser entero.' })}
+                      label="Stock *" type="number" fullWidth margin="dense" error={!!errors.stock} helperText={errors.stock?.message} InputProps={{ inputProps: { step: "1", min: "0" } }} required />
+                  </Grid>
                 </Grid>
-                <TextField
-                  {...register('category', { required: 'La categoría es obligatoria' })}
-                  label="Categoría *" fullWidth margin="dense"
-                  error={!!errors.category} helperText={errors.category?.message}
-                  required
-                />
-                <TextField {...register('sku')} label="SKU" fullWidth margin="dense" helperText="Código único (opcional)"/>
-                <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar (recomendado)"/>
+                <TextField {...register('category', { required: 'La categoría es obligatoria' })} label="Categoría *" fullWidth margin="dense" error={!!errors.category} helperText={errors.category?.message} required />
+                <TextField {...register('sku')} label="SKU" fullWidth margin="dense" helperText="Código único (opcional)" />
+                <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar (recomendado)" />
               </Grid>
             </Grid>
           </DialogContent>
