@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import apiClient from '../../api/apiClient'; // Tu instancia de Axios configurada
+import apiClient from '../../api/apiClient';
 import {
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
@@ -8,7 +8,7 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
-import { uploadImage } from '../../utils/uploadImageToFirebase'; // Verifica esta ruta
+import { uploadImage } from '../../utils/uploadImageToFirebase';
 
 console.log('--- Renderizando ProductsPage ---');
 
@@ -78,8 +78,20 @@ function ProductsPage() {
     console.log("   > Producto en edición:", editingProduct);
     console.log("   > Estado actual imagePreview:", imagePreview);
 
-    if (imageFile && imageFile instanceof FileList && imageFile.length > 0) {
-      const file = imageFile[0];
+    // RHF entrega array o FileList. Verifica ambos casos.
+    let file;
+    if (imageFile) {
+      // Si es FileList (navegadores modernos)
+      if (imageFile instanceof FileList && imageFile.length > 0) {
+        file = imageFile[0];
+      }
+      // Si RHF entrega array (algunos setups/devtools)
+      if (Array.isArray(imageFile) && imageFile.length > 0 && imageFile[0] instanceof File) {
+        file = imageFile[0];
+      }
+    }
+
+    if (file) {
       console.log("   > Archivo detectado:", file);
       console.log(`   > Detalles: nombre=${file.name}, tamaño=${file.size}, tipo=${file.type}`);
 
@@ -87,8 +99,8 @@ function ProductsPage() {
         console.warn("   > El archivo seleccionado no es de tipo imagen:", file.type);
         setSnackbar({ open: true, message: 'Por favor, selecciona un archivo de imagen (png, jpg, webp, gif).', severity: 'warning' });
         setValue('image', null);
-        if(fileInputRef.current) fileInputRef.current.value = '';
         setImagePreview(editingProduct?.image_url || null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
 
@@ -168,7 +180,12 @@ function ProductsPage() {
     let finalImageUrl = editingProduct?.image_url || "";
 
     try {
-      const newImageFile = data.image && data.image.length > 0 ? data.image[0] : null;
+      const newImageFile = (
+        data.image && data.image.length > 0
+        && (data.image[0] instanceof File)
+          ? data.image[0]
+          : null
+      );
 
       if (newImageFile) {
         console.log("   > Nuevo archivo detectado. Subiendo a Firebase:", newImageFile);
@@ -357,7 +374,7 @@ function ProductsPage() {
                     <ImageIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                   )}
                 </Card>
-                {/* --- CAMBIO CRÍTICO: Input visible, nunca oculto, registra correctamente con RHF --- */}
+                {/* Input funcional para RHF y preview */}
                 <input
                   id="image-upload-input"
                   type="file"
@@ -365,7 +382,6 @@ function ProductsPage() {
                   {...register('image')}
                   ref={fileInputRef}
                   style={{ display: "block", marginBottom: "12px" }}
-                  onChange={e => console.log("onChange REAL imagen:", e.target.files)}
                   aria-label="Subir imagen de producto"
                 />
                 {errors.image &&
