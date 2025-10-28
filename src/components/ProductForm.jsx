@@ -1,31 +1,24 @@
 import React, { useState } from "react";
-import { uploadImage } from "../utils/uploadImageToFirebase";
+import ImageUpload from "./ImageUpload";
 
 function ProductForm({ onSubmit }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [image, setImage] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUploading(true);
-    let imageUrl = "";
     try {
-      if (image) {
-        // SUBE la imagen a Firebase Storage y obtiene la URL pública
-        imageUrl = await uploadImage(image, "productos"); // "productos" es el folder opcional
-      }
-      // Envia los datos del producto al backend con la URL de Firebase
       await onSubmit({
         name,
         price: parseFloat(price),
         image_url: imageUrl,
       });
-      // Resetea campos si todo sale bien
       setName("");
       setPrice("");
-      setImage(null);
+      setImageUrl(null);
       alert("Producto registrado correctamente");
     } catch (err) {
       alert("Ocurrió un error al registrar el producto");
@@ -36,11 +29,26 @@ function ProductForm({ onSubmit }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input type="text" placeholder="Nombre" value={name} onChange={e => setName(e.target.value)} required/>
-      <input type="number" placeholder="Precio" value={price} onChange={e => setPrice(e.target.value)} required/>
-      <input type="file" accept="image/*" onChange={e => setImage(e.target.files[0])} />
-      <button type="submit" disabled={uploading}>
+    <form onSubmit={handleSubmit} style={{ maxWidth: 340, margin: "auto" }}>
+      <input
+        type="text"
+        placeholder="Nombre"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        required
+        style={{ display: "block", width: "100%", marginBottom: 10 }}
+      />
+      <input
+        type="number"
+        placeholder="Precio"
+        value={price}
+        onChange={e => setPrice(e.target.value)}
+        required
+        style={{ display: "block", width: "100%", marginBottom: 10 }}
+      />
+      {/* Componente robusto de subida y preview */}
+      <ImageUpload onUpload={(url) => setImageUrl(url)} defaultUrl={imageUrl} />
+      <button type="submit" disabled={uploading || !imageUrl} style={{ marginTop: 14, width: "100%" }}>
         {uploading ? "Registrando..." : "Registrar Producto"}
       </button>
     </form>

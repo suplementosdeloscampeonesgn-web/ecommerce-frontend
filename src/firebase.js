@@ -1,29 +1,20 @@
-// EN: src/firebaseConfig.js
-
-// Importa las funciones que necesitas
+// src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getStorage } from "firebase/storage"; // <-- CAMBIO 1: Importa getStorage
+import { getStorage } from "firebase/storage";
 
-// Tu configuración de Firebase (esta parte está bien como la copiaste)
+// La configuración de tu proyecto principal (de la consola Firebase).
 const firebaseConfig = {
   apiKey: "AIzaSyBgSSTQSv6yJWb_G3YUMeGdFnwwpoui2sA",
   authDomain: "asesoriasgnwebapp.firebaseapp.com",
   projectId: "asesoriasgnwebapp",
-  storageBucket: "asesoriasgnwebapp.appspot.com", // Mantenemos el bucket por defecto aquí
+  storageBucket: "asesoriasgnwebapp.appspot.com",
   messagingSenderId: "622314082712",
   appId: "1:622314082712:web:79c2fbfd7db2b42fdb1bed",
   measurementId: "G-PVSW7RWSVJ"
 };
 
-// Inicializa Firebase
+// Inicializa la app y Storage (si tu bucket principal es el de config, NO pongas segundo arg a getStorage).
 const app = initializeApp(firebaseConfig);
+const storage = getStorage(app); // Usa el bucket por defecto de tu config
 
-// CAMBIO 2: Inicializa Storage apuntando a TU BUCKET PERSONALIZADO
-const storage = getStorage(app, "gs://ecommerce-project-scamp");
-
-// CAMBIO 3: Exporta solo 'storage' (y 'app' si lo necesitas en otro lado)
 export { storage };
-
-// La parte de Analytics no es necesaria para subir imágenes, puedes borrarla o comentarla.
-// import { getAnalytics } from "firebase/analytics";
-// const analytics = getAnalytics(app);
