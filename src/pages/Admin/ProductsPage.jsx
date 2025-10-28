@@ -3,45 +3,44 @@ import apiClient from '../../api/apiClient';
 import {
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
-  Card, CardMedia, IconButton, FormControlLabel, Checkbox
+  Card, CardMedia, IconButton
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
 import { uploadImage } from '../../utils/uploadImageToFirebase';
 
-console.log('--- Renderizando ProductsPage ---');
-
 function ProductsPage() {
-  console.log('--- Inicializando useForm ---');
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isDirty, isValid } } = useForm({
+  const { register, handleSubmit, reset, setValue, formState: { errors, isDirty, isValid } } = useForm({
     mode: 'onChange',
     defaultValues: {
-        name: '',
-        brand: '',
-        description: '',
-        price: 0,
-        stock: 0,
-        category: '',
-        sku: '',
-        slug: '',
-        image_url: null,
-        image: null,
-        is_active: true,
-        is_featured: false,
+      name: '',
+      brand: '',
+      description: '',
+      price: 0,
+      stock: 0,
+      category: '',
+      sku: '',
+      slug: '',
+      image_url: null,
+      is_active: true,
+      is_featured: false,
     }
   });
 
-  const imageFile = watch('image');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // NUEVO: estado local para manejo correcto de archivo y preview
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
 
+  // ---------- CARGA DE PRODUCTOS ----------
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -60,55 +59,44 @@ function ProductsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+  useEffect(() => { loadProducts(); }, [loadProducts]);
 
+  // ----------- PREVIEW Y SELECCIÓN DE IMAGEN -----------
   useEffect(() => {
-    let file = null;
     if (imageFile) {
-      if (imageFile instanceof FileList && imageFile.length > 0) file = imageFile[0];
-      if (Array.isArray(imageFile) && imageFile.length > 0 && imageFile[0] instanceof File) file = imageFile[0];
-    }
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        try {
-          const url = URL.createObjectURL(file);
-          setImagePreview(url);
-          return () => URL.revokeObjectURL(url);
-        } catch (err) {
-          setSnackbar({ open: true, message: 'Error creando la vista previa: ' + err.message, severity: 'error' });
-          setImagePreview(null);
-        }
-      } else {
-        setSnackbar({ open: true, message: 'Selecciona archivo de imagen válido.', severity: 'warning' });
+      try {
+        const url = URL.createObjectURL(imageFile);
+        setImagePreview(url);
+        return () => URL.revokeObjectURL(url);
+      } catch (err) {
+        setSnackbar({ open: true, message: 'Error creando vista previa: ' + err.message, severity: 'error' });
         setImagePreview(null);
       }
+    } else if (editingProduct?.image_url) {
+      setImagePreview(editingProduct.image_url);
     } else {
-      if (editingProduct?.image_url) {
-        setImagePreview(editingProduct.image_url);
-      } else {
-        setImagePreview(null);
-      }
+      setImagePreview(null);
     }
   }, [imageFile, editingProduct]);
 
+  // ---------- ABRIR/CERRAR MODAL ----------
   const handleOpenModal = useCallback((product = null) => {
     reset();
-    setImagePreview(product?.image_url || null);
     setEditingProduct(product);
+    setImagePreview(product?.image_url || null);
+    setImageFile(null);
     if (product) {
       Object.entries(product).forEach(([key, value]) => {
-         if (key !== 'image') {
-            try { setValue(key, value, { shouldValidate: true, shouldDirty: false }); } catch (e) {}
-         }
+        if (key !== 'image_url') {
+          try { setValue(key, value, { shouldValidate: true, shouldDirty: false }); } catch (e) {}
+        }
       });
-      setValue('image', null);
+      setValue('image_url', product?.image_url || null);
     } else {
-        reset();
-        setValue('id', null);
-        setValue('image', null);
-        setImagePreview(null);
+      reset();
+      setValue('id', null);
+      setValue('image_url', null);
+      setImagePreview(null);
     }
     setIsModalOpen(true);
   }, [reset, setValue]);
@@ -117,34 +105,25 @@ function ProductsPage() {
     setIsModalOpen(false);
     setEditingProduct(null);
     reset();
+    setImageFile(null);
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [reset]);
 
+  // ---------- SUBMIT FORM ----------
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     let finalImageUrl = editingProduct?.image_url || "";
     try {
-      let newImageFile = (
-        data.image && data.image.length > 0
-        && (data.image[0] instanceof File)
-          ? data.image[0]
-          : null
-      );
-      if (newImageFile) {
-        const uploadedUrl = await uploadImage(newImageFile); // Usa tu función conectada a /api/admin/upload-images
+      if (imageFile) {
+        const uploadedUrl = await uploadImage(imageFile);
         if (!uploadedUrl) throw new Error("La subida de la imagen falló.");
         finalImageUrl = uploadedUrl;
-      } else {
-        if (data.image_url === null || data.image_url === '') {
-          finalImageUrl = data.image_url;
-        }
+      } else if (!data.image_url) {
+        finalImageUrl = '';
       }
-      const body = {
-        ...data,
-        image_url: finalImageUrl,
-        image: undefined
-      };
+      const body = { ...data, image_url: finalImageUrl };
+      // Quita id si es nuevo producto
       if (!editingProduct) delete body.id;
       let response;
       if (editingProduct) {
@@ -162,6 +141,7 @@ function ProductsPage() {
     }
   };
 
+  // ---------- ELIMINAR PRODUCTO ----------
   const handleDelete = useCallback(async (id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       setLoading(true);
@@ -177,13 +157,15 @@ function ProductsPage() {
     }
   }, [loadProducts]);
 
+  // ----------- REMOVER IMAGEN -----------
   const handleRemoveImage = useCallback(() => {
     setImagePreview(null);
-    setValue('image', null, { shouldDirty: true });
+    setImageFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (editingProduct) setValue('image_url', null, { shouldDirty: true });
   }, [setValue, editingProduct]);
 
+  // ---------- COLUMNS DATAGRID ----------
   const columns = React.useMemo(() => [
     { field: 'id', headerName: 'ID', width: 70 },
     {
@@ -194,9 +176,9 @@ function ProductsPage() {
         <CardMedia
           component="img"
           sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
-          image={params.value || 'https://via.placeholder.com/60?text=No+Img'}
+          image={params.value || '/no-img.png'} // local fallback
           alt="Imagen Producto"
-          onError={e => { e.target.onerror = null; e.target.src='https://via.placeholder.com/60?text=Error'; }}
+          onError={e => { e.target.onerror = null; e.target.src='/no-img.png'; }}
         />
       ),
       sortable: false, filterable: false,
@@ -208,19 +190,14 @@ function ProductsPage() {
       headerName: 'Precio ($)',
       type: 'number',
       width: 110,
-      valueFormatter: (value) => {
-        if (typeof value === 'number') return `$${value.toFixed(2)}`;
-        return '$ --';
-      }
+      valueFormatter: (value) => (typeof value === 'number' ? `$${value.toFixed(2)}` : '$ --')
     },
     { field: 'stock', headerName: 'Stock', type: 'number', width: 90 },
     { field: 'category', headerName: 'Categoría', width: 140 },
     {
       field: 'actions',
       headerName: 'Acciones',
-      width: 130,
-      sortable: false,
-      filterable: false,
+      width: 130, sortable: false, filterable: false,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <IconButton aria-label="Editar" color="primary" size="small" onClick={() => handleOpenModal(params.row)}><Edit fontSize="small" /></IconButton>
@@ -233,19 +210,17 @@ function ProductsPage() {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Cargando productos...</Typography>
+        <CircularProgress /><Typography sx={{ ml: 2 }}>Cargando productos...</Typography>
       </Box>
     );
   }
 
+  // ------------- RENDER -------------
   return (
     <Box sx={{ width: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>Gestión de Productos</Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenModal()}>
-          Añadir Producto
-        </Button>
+        <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenModal()}>Añadir Producto</Button>
       </Box>
       <Box sx={{ height: '70vh', width: '100%', backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}>
         <DataGrid
@@ -278,20 +253,22 @@ function ProductsPage() {
                     <ImageIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                   )}
                 </Card>
+                {/* Nuevo input manejado con estado */}
                 <input
                   id="image-upload-input"
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  {...register('image')}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={e => {
+                    const file = e.target.files[0];
+                    if (file && file.type.startsWith("image/")) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
                   ref={fileInputRef}
                   style={{ display: "block", marginBottom: "12px" }}
                   aria-label="Subir imagen de producto"
                 />
-                {errors.image &&
-                  <Typography color="error" variant="caption" sx={{ display: 'block', mt: 1 }}>
-                    {errors.image.message || 'Error en archivo de imagen'}
-                  </Typography>
-                }
               </Grid>
               <Grid item xs={12} md={8}>
                 <TextField  {...register('name', { required: 'El nombre es obligatorio' })} label="Nombre del Producto *" fullWidth margin="dense"
@@ -327,19 +304,19 @@ function ProductsPage() {
         </form>
       </Dialog>
       <Snackbar
-         open={snackbar.open}
-         autoHideDuration={6000}
-         onClose={() => setSnackbar({ ...snackbar, open: false })}
-         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-       >
-         <Alert
-           onClose={() => setSnackbar({ ...snackbar, open: false })}
-           severity={snackbar.severity} sx={{ width: '100%' }}
-           variant="filled"
-         >
-           {snackbar.message}
-         </Alert>
-       </Snackbar>
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity} sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
