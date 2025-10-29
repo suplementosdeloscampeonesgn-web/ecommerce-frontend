@@ -44,7 +44,7 @@ function ProductsPage() {
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/admin/products');
+      const response = await apiClient.get('/api/admin/products/');
       if (response.data && Array.isArray(response.data)) {
         setProducts(response.data);
       } else {
@@ -129,7 +129,7 @@ function ProductsPage() {
       if (editingProduct) {
         response = await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
       } else {
-        response = await apiClient.post('/api/admin/products', body);
+        response = await apiClient.post('/api/admin/products/', body);
       }
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
       await loadProducts();
