@@ -15,7 +15,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import OrderConfirmation from './pages/OrderConfirmation';
-import OrderDetail from './components/profile/OrderDetail';  // ✅ nuevo
+import OrderDetail from './components/profile/OrderDetail';
 
 // --- ADMINISTRACIÓN ---
 import PrivateRoute from './components/PrivateRoute';
@@ -23,6 +23,7 @@ import AdminLayout from './pages/Admin/AdminLayout';
 import DashboardPage from './pages/Admin/DashboardPage';
 import ProductsPage from './pages/Admin/ProductsPage';
 import OrdersPage from './pages/Admin/OrdersPage';
+import AdminMediaUploader from './pages/Admin/AdminMediaUploader'; // 👈 ¡NUEVO!
 import './styles/index.css';
 
 const MainLayout = () => (
@@ -51,7 +52,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/order-detail/:orderId" element={<OrderDetail />} /> {/* ✅ Detalle de pedido fuera del perfil */}
+              <Route path="/order-detail/:orderId" element={<OrderDetail />} />
               <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
             </Route>
 
@@ -67,6 +68,7 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="media" element={<AdminMediaUploader />} /> {/* 👈 ¡NUEVO! */}
             </Route>
           </Routes>
         </ProductProvider>
