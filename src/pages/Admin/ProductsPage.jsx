@@ -1,30 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import apiClient from '../../api/apiClient';
+// 👇 ****** ¡CORRECCIÓN AQUÍ! ****** 👇
+import { apiClient } from '../../api/apiClient'; // Tu instancia de Axios configurada
+// 👆 ****** ¡CORRECCIÓN AQUÍ! ****** 👆
 import {
   Box, Button, CircularProgress, Typography, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert, Grid,
-  Card, CardMedia, IconButton
+  Card, CardMedia, IconButton, FormControlLabel, Checkbox
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { useForm } from 'react-hook-form';
 import { Add, Edit, Delete, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material';
-import { uploadImage } from '../../utils/uploadImageToFirebase';
+// 👇 ****** ¡Y AQUÍ TAMBIÉN! ****** 👇
+import { uploadImage } from '../../utils/uploadImageToFirebase'; // Asegúrate que esta ruta sea correcta
+
+console.log('--- Renderizando ProductsPage ---');
 
 function ProductsPage() {
+  console.log('--- Inicializando useForm ---');
   const { register, handleSubmit, reset, setValue, formState: { errors, isDirty, isValid } } = useForm({
     mode: 'onChange',
     defaultValues: {
-      name: '',
-      brand: '',
-      description: '',
-      price: 0,
-      stock: 0,
-      category: '',
-      sku: '',
-      slug: '',
-      image_url: null,
-      is_active: true,
-      is_featured: false,
+        name: '',
+        brand: '',
+        description: '',
+        price: 0,
+        stock: 0,
+        category: '',
+        sku: '',
+        slug: '',
+        image_url: null,
+        // 'image' ya no es parte de defaultValues porque se maneja por estado
+        is_active: true,
+        is_featured: false,
     }
   });
 
@@ -36,7 +43,7 @@ function ProductsPage() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // NUEVO: estado local para manejo correcto de archivo y preview
-  const [imageFile, setImageFile] = useState(null);
+  const [imageFile, setImageFile] = useState(null); // <-- ¡Genial!
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -44,7 +51,8 @@ function ProductsPage() {
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/admin/products/');
+      // Asegúrate que la ruta termine con '/' si así lo espera tu backend
+      const response = await apiClient.get('/api/admin/products'); 
       if (response.data && Array.isArray(response.data)) {
         setProducts(response.data);
       } else {
@@ -61,41 +69,56 @@ function ProductsPage() {
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
-  // ----------- PREVIEW Y SELECCIÓN DE IMAGEN -----------
+  // ----------- PREVIEW Y SELECCIÓN DE IMAGEN (TU LÓGICA NUEVA - ESTÁ BIEN) -----------
   useEffect(() => {
-    if (imageFile) {
+    // Este efecto maneja la preview basada en el estado imageFile O el producto editado
+    let newPreviewUrl = null;
+    if (imageFile) { // Prioridad 1: El nuevo archivo seleccionado
       try {
-        const url = URL.createObjectURL(imageFile);
-        setImagePreview(url);
-        return () => URL.revokeObjectURL(url);
+        newPreviewUrl = URL.createObjectURL(imageFile);
+        setImagePreview(newPreviewUrl);
       } catch (err) {
         setSnackbar({ open: true, message: 'Error creando vista previa: ' + err.message, severity: 'error' });
         setImagePreview(null);
       }
-    } else if (editingProduct?.image_url) {
+    } else if (editingProduct?.image_url) { // Prioridad 2: La imagen del producto que se edita
       setImagePreview(editingProduct.image_url);
-    } else {
+    } else { // Prioridad 3: Nada
       setImagePreview(null);
     }
-  }, [imageFile, editingProduct]);
+
+    // Función de limpieza para la URL del Blob
+    return () => {
+      if (newPreviewUrl) {
+        URL.revokeObjectURL(newPreviewUrl);
+      }
+    };
+  }, [imageFile, editingProduct]); // Se ejecuta si cambia el archivo o el producto
 
   // ---------- ABRIR/CERRAR MODAL ----------
   const handleOpenModal = useCallback((product = null) => {
-    reset();
+    reset(); // Resetea validaciones y valores de RHF
     setEditingProduct(product);
-    setImagePreview(product?.image_url || null);
-    setImageFile(null);
+    setImageFile(null); // Limpia el estado del archivo
+    
+    if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Limpia el input de archivo
+    }
+
     if (product) {
+      // Llena el formulario con datos del producto
       Object.entries(product).forEach(([key, value]) => {
-        if (key !== 'image_url') {
-          try { setValue(key, value, { shouldValidate: true, shouldDirty: false }); } catch (e) {}
-        }
+         // Asegúrate de que el campo exista en defaultValues
+         if (key in reset().defaultValues) {
+            setValue(key, value, { shouldValidate: true, shouldDirty: false });
+         }
       });
-      setValue('image_url', product?.image_url || null);
+      // Importante: Setea image_url en RHF también
+      setValue('image_url', product.image_url || null);
+      // El useEffect de preview se encargará de setear imagePreview
     } else {
-      reset();
-      setValue('id', null);
-      setValue('image_url', null);
+      // Es un producto nuevo, resetea todo a los valores por defecto
+      reset(); 
       setImagePreview(null);
     }
     setIsModalOpen(true);
@@ -105,37 +128,49 @@ function ProductsPage() {
     setIsModalOpen(false);
     setEditingProduct(null);
     reset();
-    setImageFile(null);
-    setImagePreview(null);
+    setImageFile(null); // Limpia estado de archivo
+    setImagePreview(null); // Limpia preview
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [reset]);
 
   // ---------- SUBMIT FORM ----------
-  const onSubmit = async (data) => {
+  const onSubmit = async (data) => { // 'data' viene de RHF (todo menos la imagen)
     setIsSubmitting(true);
-    let finalImageUrl = editingProduct?.image_url || "";
+    // Inicia con la URL que está en el formulario (puede ser la original o null si se quitó)
+    let finalImageUrl = data.image_url; 
+    
     try {
-      if (imageFile) {
-        const uploadedUrl = await uploadImage(imageFile);
+      // Si hay un *nuevo* archivo en el estado 'imageFile', súbelo
+      if (imageFile) { 
+        console.log("Subiendo nuevo archivo:", imageFile.name);
+        const uploadedUrl = await uploadImage(imageFile, "productos"); // Tu función de subida
         if (!uploadedUrl) throw new Error("La subida de la imagen falló.");
-        finalImageUrl = uploadedUrl;
-      } else if (!data.image_url) {
-        finalImageUrl = '';
+        finalImageUrl = uploadedUrl; // Reemplaza la URL
+      } else {
+        console.log("No hay archivo nuevo. Usando image_url del formulario:", finalImageUrl);
       }
+
+      // Prepara el body: datos de RHF + la URL de imagen final
       const body = { ...data, image_url: finalImageUrl };
-      // Quita id si es nuevo producto
-      if (!editingProduct) delete body.id;
+
+      if (!editingProduct) delete body.id; // Quita 'id' si es nuevo
+
       let response;
       if (editingProduct) {
+        console.log("Actualizando producto:", body);
         response = await apiClient.put(`/api/admin/products/${editingProduct.id}`, body);
       } else {
-        response = await apiClient.post('/api/admin/products/', body);
+        console.log("Creando producto:", body);
+        response = await apiClient.post('/api/admin/products/', body); // Asegúrate que ruta POST termine en '/'
       }
+      
+      console.log("Respuesta API:", response.data);
       setSnackbar({ open: true, message: `Producto ${editingProduct ? 'actualizado' : 'creado'} con éxito.`, severity: 'success' });
       await loadProducts();
       handleCloseModal();
     } catch (error) {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+      console.error("Error en onSubmit:", error.response?.data || error);
+      setSnackbar({ open: true, message: `Error: ${error.response?.data?.detail || error.message}`, severity: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -157,15 +192,17 @@ function ProductsPage() {
     }
   }, [loadProducts]);
 
-  // ----------- REMOVER IMAGEN -----------
+  // ----------- REMOVER IMAGEN (TU LÓGICA NUEVA - ESTÁ BIEN) -----------
   const handleRemoveImage = useCallback(() => {
+    console.log("Removiendo imagen...");
     setImagePreview(null);
-    setImageFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (editingProduct) setValue('image_url', null, { shouldDirty: true });
-  }, [setValue, editingProduct]);
+    setImageFile(null); // Limpia el archivo del estado
+    if (fileInputRef.current) fileInputRef.current.value = ''; // Limpia el input
+    // Actualiza RHF para que 'image_url' sea null, marcando que se borró
+    setValue('image_url', null, { shouldDirty: true }); 
+  }, [setValue]); // Quita editingProduct, no es necesario
 
-  // ---------- COLUMNS DATAGRID ----------
+  // ---------- COLUMNS DATAGRID (CON CORRECCIÓN toFixed) ----------
   const columns = React.useMemo(() => [
     { field: 'id', headerName: 'ID', width: 70 },
     {
@@ -176,9 +213,9 @@ function ProductsPage() {
         <CardMedia
           component="img"
           sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '4px' }}
-          image={params.value || '/no-img.png'} // local fallback
+          image={params.value || 'https://via.placeholder.com/60?text=No+Img'} // Placeholder
           alt="Imagen Producto"
-          onError={e => { e.target.onerror = null; e.target.src='/no-img.png'; }}
+          onError={e => { e.target.onerror = null; e.target.src='https://via.placeholder.com/60?text=Error'; }}
         />
       ),
       sortable: false, filterable: false,
@@ -190,7 +227,13 @@ function ProductsPage() {
       headerName: 'Precio ($)',
       type: 'number',
       width: 110,
-      valueFormatter: (value) => (typeof value === 'number' ? `$${value.toFixed(2)}` : '$ --')
+      // ✅ CORRECCIÓN toFixed (ya la tenías bien)
+      valueFormatter: ({ value }) => {
+        if (typeof value === 'number' && !isNaN(value)) {
+          return `$${value.toFixed(2)}`;
+        }
+        return '$ --';
+      }
     },
     { field: 'stock', headerName: 'Stock', type: 'number', width: 90 },
     { field: 'category', headerName: 'Categoría', width: 140 },
@@ -205,7 +248,7 @@ function ProductsPage() {
         </Box>
       ),
     },
-  ], [handleDelete, handleOpenModal]);
+  ], [handleDelete, handleOpenModal]); // Dependencias correctas
 
   if (loading) {
     return (
@@ -253,7 +296,7 @@ function ProductsPage() {
                     <ImageIcon sx={{ fontSize: 80, color: 'text.disabled' }} />
                   )}
                 </Card>
-                {/* Nuevo input manejado con estado */}
+                {/* Input de archivo visible (TU LÓGICA NUEVA - ESTÁ BIEN) */}
                 <input
                   id="image-upload-input"
                   type="file"
@@ -261,14 +304,17 @@ function ProductsPage() {
                   onChange={e => {
                     const file = e.target.files[0];
                     if (file && file.type.startsWith("image/")) {
-                      setImageFile(file);
-                      setImagePreview(URL.createObjectURL(file));
+                      setImageFile(file); // Setea el estado
+                      // El useEffect se encargará del preview
+                    } else {
+                      setImageFile(null); // Limpia si el archivo no es válido
                     }
                   }}
                   ref={fileInputRef}
                   style={{ display: "block", marginBottom: "12px" }}
                   aria-label="Subir imagen de producto"
                 />
+                 {/* Ya no necesitas {...register('image')} aquí */}
               </Grid>
               <Grid item xs={12} md={8}>
                 <TextField  {...register('name', { required: 'El nombre es obligatorio' })} label="Nombre del Producto *" fullWidth margin="dense"
@@ -288,6 +334,8 @@ function ProductsPage() {
                 <TextField {...register('category', { required: 'La categoría es obligatoria' })} label="Categoría *" fullWidth margin="dense" error={!!errors.category} helperText={errors.category?.message} required />
                 <TextField {...register('sku')} label="SKU" fullWidth margin="dense" helperText="Código único (opcional)" />
                 <TextField {...register('slug')} label="Slug (URL)" fullWidth margin="dense" helperText="Dejar vacío para autogenerar (recomendado)" />
+                {/* Campo oculto para image_url (manejado por RHF) */}
+                <input type="hidden" {...register('image_url')} />
               </Grid>
             </Grid>
           </DialogContent>
@@ -296,7 +344,7 @@ function ProductsPage() {
             <Button
               type="submit"
               variant="contained"
-              disabled={isSubmitting || !isDirty || !isValid}
+              disabled={isSubmitting || !isDirty || !isValid} // Deshabilita si no hay cambios o no es válido
             >
               {isSubmitting ? <CircularProgress size={24} color="inherit" /> : (editingProduct ? 'Actualizar Producto' : 'Crear Producto')}
             </Button>
