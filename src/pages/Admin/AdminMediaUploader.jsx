@@ -1,8 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Box, Button, Typography, List, ListItem, ListItemText, LinearProgress, Paper, TextField, Alert } from '@mui/material';
 import { UploadFile as UploadFileIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
-// LÍNEA 4 (CORREGIDA)
-import { uploadImage } from '../../utils/uploadImageToFirebase'; // <-- ¡CON llaves! // Asegúrate que esta ruta sea correcta
+import { uploadImage } from '../../utils/uploadImageToFirebase'; // Asegúrate que esta ruta sea correcta
 
 function AdminMediaUploader() {
   const [selectedFiles, setSelectedFiles] = useState([]); // Archivos seleccionados por el usuario
