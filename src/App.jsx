@@ -3,7 +3,6 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
 
-// --- COMPONENTES Y PÁGINAS PÚBLICAS ---
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -17,13 +16,16 @@ import Profile from './pages/Profile';
 import OrderConfirmation from './pages/OrderConfirmation';
 import OrderDetail from './components/profile/OrderDetail';
 
-// --- ADMINISTRACIÓN ---
+// --- Las nuevas rutas:
+import AvisoPrivacidad from './pages/AvisoPrivacidad';
+import Contacto from './pages/Contacto';
+
 import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './pages/Admin/AdminLayout';
 import DashboardPage from './pages/Admin/DashboardPage';
 import ProductsPage from './pages/Admin/ProductsPage';
 import OrdersPage from './pages/Admin/OrdersPage';
-import AdminMediaUploader from './pages/Admin/AdminMediaUploader'; // 👈 ¡NUEVO!
+import AdminMediaUploader from './pages/Admin/AdminMediaUploader';
 import './styles/index.css';
 
 const MainLayout = () => (
@@ -54,6 +56,9 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/order-detail/:orderId" element={<OrderDetail />} />
               <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
+              {/* NUEVAS RUTAS */}
+              <Route path="/aviso" element={<AvisoPrivacidad />} />
+              <Route path="/contacto" element={<Contacto />} />
             </Route>
 
             {/* --- RUTAS PRIVADAS DE ADMINISTRACIÓN --- */}
@@ -68,7 +73,7 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="orders" element={<OrdersPage />} />
-              <Route path="media" element={<AdminMediaUploader />} /> {/* 👈 ¡NUEVO! */}
+              <Route path="media" element={<AdminMediaUploader />} />
             </Route>
           </Routes>
         </ProductProvider>

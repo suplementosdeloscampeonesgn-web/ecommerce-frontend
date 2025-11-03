@@ -117,7 +117,7 @@ export default function Home() {
           <blockquote className="fs-4 text-primary fw-semibold fst-italic flex-grow-1 m-0 text-center text-md-start">
             “Los productos GN mejoraron mi resistencia y mi salud. Realmente son suplementos de campeones.”
             <br />
-            <span className="d-block text-warning fw-bold mt-2">— Brenda G., atleta nacional</span>
+            <span className="d-block text-warning fw-bold mt-2">— </span>
           </blockquote>
         </div>
       </section>
