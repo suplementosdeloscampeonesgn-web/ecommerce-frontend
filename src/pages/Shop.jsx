@@ -29,21 +29,24 @@ export default function Shop() {
     const API_URL = import.meta.env.VITE_API_URL;
     setLoading(true);
     
-    // ✅ CORREGIDO: Se añade la barra inclinada al final de la URL
     axios.get(`${API_URL}/api/products`)
-  .then(res => {
-    if (Array.isArray(res.data)) {
-      setProducts(res.data);
-    } else {
-      setProducts([]);
-      console.error("La respuesta de la API no es un array:", res.data);
-    }
-  })
-  .catch((err) => {
-    setProducts([]);
-    console.error("Error al pedir los productos:", err);
-  })
-  .finally(() => setLoading(false));
+      .then(res => {
+        // --- CAMBIO PARA EL BUG DE DATOS ---
+        // Esto ahora revisa si 'res.data.items' existe, o 'res.data' es un array
+        // O si 'res.data.products' existe. Cubre todas tus bases.
+        const productData = res.data?.items || (Array.isArray(res.data) ? res.data : res.data?.products) || [];
+        setProducts(productData);
+        if (productData.length === 0 && Array.isArray(res.data)) {
+           console.log("API devolvió un array vacío.");
+        } else if (productData.length === 0) {
+           console.warn("No se encontró 'items' o 'products' en la respuesta de la API:", res.data);
+        }
+      })
+      .catch((err) => {
+        setProducts([]);
+        console.error("Error al pedir los productos:", err);
+      })
+      .finally(() => setLoading(false));
 
   }, []); // El array vacío asegura que esto se ejecute solo una vez al montar
 
@@ -69,28 +72,47 @@ export default function Shop() {
 
   // (El JSX para renderizar filtros y productos estaba bien)
   return (
-    <div className="shop-bg-gradient min-vh-100 pt-5">
+    // --- CAMBIO DE DISEÑO ---
+    // 1. Clase 'shop-bg-gradient' eliminada. Ahora usará el fondo <body> de index.css
+    <div className="min-vh-100 pt-5">
       <div className="container d-flex flex-column flex-lg-row gap-4 px-0">
+        
+        {/* === SIDEBAR / FILTROS === */}
         <aside className="col-12 col-lg-3 mb-4 mb-lg-0">
-          <div className="bg-white p-4 rounded-4 shadow sticky-top-filtros">
-            <h2 className="fw-black fs-4 text-primary mb-3">Buscar</h2>
+          {/* --- CAMBIO DE DISEÑO ---
+            1. 'bg-white' -> 'bg-dark'
+          */}
+          <div className="bg-dark p-4 rounded-4 shadow sticky-top-filtros">
+            {/* --- CAMBIO DE DISEÑO ---
+              1. 'text-primary' -> 'text-info' (tu azul acento)
+            */}
+            <h2 className="fw-black fs-4 text-info mb-3">Buscar</h2>
             <div className="mb-4">
               <input 
                 type="text"
-                className="form-control"
+                // --- CAMBIO DE DISEÑO ---
+                // 1. Añadidas clases para que el input sea oscuro
+                className="form-control bg-dark text-light border-secondary"
                 placeholder="Nombre del producto..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <h2 className="fw-black fs-4 text-primary mb-3">Filtrar por Categoría</h2>
-            <div className="d-flex flex-column gap-2 fw-medium text-secondary">
+            {/* --- CAMBIO DE DISEÑO ---
+              1. 'text-primary' -> 'text-info'
+            */}
+            <h2 className="fw-black fs-4 text-info mb-3">Filtrar por Categoría</h2>
+            {/* --- CAMBIO DE DISEÑO ---
+              1. 'text-secondary' -> 'text-light' (para que se lea en fondo oscuro)
+            */}
+            <div className="d-flex flex-column gap-2 fw-medium text-light">
               {FILTERS.map(({ key, label }) => (
                 <label key={key} className="d-flex align-items-center pointer">
                   <input
                     type="checkbox"
-                    className="form-check-input me-2 accent-warning"
+                    // 'accent-warning' se ve bien, lo dejamos
+                    className="form-check-input me-2 accent-warning" 
                     checked={activeFilters.includes(key)}
                     onChange={() => handleFilterChange(key)}
                   />
@@ -101,37 +123,49 @@ export default function Shop() {
           </div>
         </aside>
 
+        {/* === SECCIÓN DE PRODUCTOS === */}
         <section className="flex-grow-1">
           <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-            <h1 className="fs-2 fw-bold text-primary">Tienda de Suplementos</h1>
-            <span className="text-secondary small">{filteredProducts.length} productos</span>
+            {/* --- CAMBIO DE DISEÑO ---
+              1. 'text-primary' -> 'text-info'
+            */}
+            <h1 className="fs-2 fw-bold text-info">Tienda de Suplementos</h1>
+            {/* --- CAMBIO DE DISEÑO ---
+              1. 'text-secondary' -> 'text-white-50' (gris claro)
+            */}
+            <span className="text-white-50 small">{filteredProducts.length} productos</span>
           </div>
 
           {loading ? (
-             <div className="text-primary fw-bold fs-4 py-5 text-center">Cargando productos...</div>
-           ) : filteredProducts.length === 0 ? (
-             <div className="text-muted py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
-           ) : (
-             <div className="row g-3 animate-fade-in">
-               {filteredProducts.slice(0, visible).map(product => (
-                 <div className="col-12 col-sm-6 col-md-4" key={product.id}>
-                   {/* Asegúrate que ProductCard use product.image_url */}
-                   <ProductCard product={product} /> 
-                 </div>
-               ))}
-             </div>
-           )}
+             // --- CAMBIO DE DISEÑO ---
+            <div className="text-info-emphasis fw-bold fs-4 py-5 text-center">Cargando productos...</div>
+          ) : filteredProducts.length === 0 ? (
+             // --- CAMBIO DE DISEÑO ---
+            <div className="text-white-50 py-5 text-center fw-semibold fs-5">No se encontraron productos con esos filtros.</div>
+          ) : (
+            <div className="row g-3 animate-fade-in">
+              {filteredProducts.slice(0, visible).map(product => (
+                <div className="col-12 col-sm-6 col-md-4" key={product.id}>
+                  {/* Asegúrate que ProductCard use product.image_url */}
+                  <ProductCard product={product} /> 
+                </div>
+              ))}
+            </div>
+          )}
 
-           {visible < filteredProducts.length && (
-             <div className="d-flex justify-content-center mt-5">
-               <button
-                 className="btn btn-primary btn-lg fw-bold rounded-pill shop-btn"
-                 onClick={() => setVisible(v => v + 8)}
-               >
-                 Ver más productos
-               </button>
-             </div>
-           )}
+          {visible < filteredProducts.length && (
+            <div className="d-flex justify-content-center mt-5">
+              <button
+                // --- CAMBIO DE DISEÑO ---
+                // 1. Clases en conflicto ('btn-primary', 'shop-btn') eliminadas
+                // 2. Reemplazadas por 'btn-info' (tu azul) y 'rounded-pill'
+                className="btn btn-info btn-lg fw-bold rounded-pill text-white"
+                onClick={() => setVisible(v => v + 8)}
+              >
+                Ver más productos
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </div>
