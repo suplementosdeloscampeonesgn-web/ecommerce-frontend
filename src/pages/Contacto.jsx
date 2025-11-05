@@ -6,7 +6,7 @@ export default function Contacto() {
     <div className="container py-5 animate-fade-in">
       <h1 className="fw-bold mb-3 text-primary">Contacto</h1>
       <p className="fs-5 mb-4 text-dark">
-        ¿Necesitas ayuda, cotización o información sobre productos? Envíanos un mensaje y te contestamos en menos de 24 horas.
+        ¿Necesitas ayuda, cotización o información sobre productos? Envíanos un mensaje y te contestamos en menos de 12 horas.
       </p>
       <form className="bg-light p-4 rounded shadow mb-5" style={{ maxWidth: "500px" }}>
         <div className="mb-3">
@@ -24,7 +24,7 @@ export default function Contacto() {
         <button type="submit" className="btn btn-primary fw-bold w-100">Enviar mensaje</button>
       </form>
       <div className="text-black-50 mt-4">
-        También puedes enviarnos correo directo a <a href="mailto:contacto@suplementosgn.mx" className="text-primary">contacto@suplementosgn.mx</a>
+        También puedes enviarnos correo directo a <a href="mailto:contacto@suplementosgn.mx" className="text-primary">suplementosdeloscampeonesgn@gmail.com</a>
       </div>
     </div>
   );
